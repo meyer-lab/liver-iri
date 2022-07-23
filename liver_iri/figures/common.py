@@ -56,24 +56,20 @@ def getSetup(figsize, gridd, multz=None, empts=None, style="whitegrid"):
 
     # Setup plotting space and grid
     f = plt.figure(figsize=figsize, constrained_layout=True)
-    gs = gridspec.GridSpec(**gridd, figure=f)
+    gs = gridspec.GridSpec(*gridd, figure=f)
 
     # Get list of axis objects
     x = 0
     ax = list()
-    while x < gridd['nrows'] * gridd['ncols']:
+    while x < gridd[0] * gridd[1]:
         if x not in empts and x not in multz.keys():  # If this is just a normal subplot
-            ax.append(
-                f.add_subplot(
-                    gs[x],
-                )
-            )
+            ax.append(f.add_subplot(gs[x]))
         elif x in multz.keys():  # If this is a subplot that spans grid elements
             ax.append(f.add_subplot(gs[x: x + multz[x] + 1]))
             x += multz[x]
         x += 1
 
-    return ax, f, gs
+    return ax, f
 
 
 def subplotLabel(axs):

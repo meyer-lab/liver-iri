@@ -14,6 +14,7 @@ xarray = "^2022.6.0"
 matplotlib = "^3.5.2"
 seaborn = "^0.11.2"
 svgutils = "^0.3.4"
+tensorpack = { git = "https://github.com/meyer-lab/tensorpack.git", branch = "main" }
 
 
 [tool.poetry.dev-dependencies]
