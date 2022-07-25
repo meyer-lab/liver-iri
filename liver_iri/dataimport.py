@@ -13,7 +13,9 @@ def cytokine_data():
     )
 
     # log standardize data
-    df.iloc[:, 6:] = np.log(df.iloc[:, 6:]).replace(-np.inf, 0)
+    col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:]>0), axis=0)
+    df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
+    df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
     df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
     df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
 
