@@ -5,7 +5,11 @@ import numpy as np
 from tensorpack import perform_CP
 from matplotlib import gridspec, pyplot as plt
 import seaborn as sns
-import scipy.cluster.hierarchy as sch
+
+from .common import getSetup
+from ..tensor import get_factors
+from ..utils import reorder_table
+
 
 def makeFigure():
     data = cytokine_data()
@@ -29,9 +33,12 @@ def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
             rr = axes_names.index(r_ax)
             factors[rr] = reorder_table(factors[rr])
 
-    f = plt.figure(figsize=(5*ddims, 6))
-    gs = gridspec.GridSpec(1, ddims, wspace=0.5)
-    axes = [plt.subplot(gs[rr]) for rr in range(ddims)]
+    fig_size = (5 * ddims, 6)
+    layout = {'nrows': 1, 'ncols': ddims, 'wspace': 0.1}
+    axes, fig = getSetup(
+        fig_size,
+        layout
+    )
     comp_labels = [str(ii + 1) for ii in range(rank)]
 
     for rr in range(ddims):
@@ -40,19 +47,4 @@ def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
         axes[rr].set_xlabel("Components")
         axes[rr].set_title(axes_names[rr])
 
-    return f
-
-
-def reorder_table(df):
-    """
-    Reorder a table's rows using hierarchical clustering.
-    Parameters:
-        df (pandas.DataFrame): data to be clustered; rows are treated as samples
-            to be clustered
-    Returns:
-        df (pandas.DataFrame): data with rows reordered via heirarchical
-            clustering
-    """
-    y = sch.linkage(df.to_numpy(), method='centroid')
-    index = sch.dendrogram(y, orientation='right', no_plot=True)['leaves']
-    return df.iloc[index, :]
+    return fig
