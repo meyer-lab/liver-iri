@@ -6,8 +6,9 @@ from sklearn.utils import resample
 from sklearn.preprocessing import LabelEncoder, scale
 from tensorpack import perform_CP
 
-from .common import OPTIMAL_COMPONENTS, getSetup
+from .common import getSetup
 from ..dataimport import cytokine_data, import_meta
+from ..tensor import OPTIMAL_COMPONENTS, get_factors
 from ..predict import predict_categorical, predict_continuous
 
 warnings.filterwarnings('ignore')
@@ -24,18 +25,6 @@ TRANSLATIONS = {
     'postrepiri': 'LIRI'
 }
 N_BOOTSTRAP = 30
-
-
-def get_factors(rank=9):
-    data = cytokine_data()
-    cp = perform_CP(data.values, rank)
-    factors = pd.DataFrame(
-        cp.factors[0],
-        index=data.Patient.values,
-        columns=np.arange(1, rank + 1)
-    )
-    return factors
-
 
 def get_accuracies(factors, meta):
     encoder = LabelEncoder()

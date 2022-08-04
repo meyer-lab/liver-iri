@@ -4,6 +4,7 @@ from tensorpack import perform_CP
 
 from .dataimport import cytokine_data
 
+OPTIMAL_COMPONENTS = 9
 
 def get_factors(rank=9):
     data = cytokine_data()

@@ -12,8 +12,6 @@ import logging
 import time
 
 
-OPTIMAL_COMPONENTS = 9
-
 matplotlib.use('TkAgg')
 
 matplotlib.rcParams["axes.labelsize"] = 10
