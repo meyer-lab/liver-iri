@@ -12,7 +12,9 @@ import logging
 import time
 
 
-matplotlib.use('AGG')
+OPTIMAL_COMPONENTS = 9
+
+matplotlib.use('TkAgg')
 
 matplotlib.rcParams["axes.labelsize"] = 10
 matplotlib.rcParams["axes.linewidth"] = 0.6
@@ -56,12 +58,12 @@ def getSetup(figsize, gridd, multz=None, empts=None, style="whitegrid"):
 
     # Setup plotting space and grid
     f = plt.figure(figsize=figsize, constrained_layout=True)
-    gs = gridspec.GridSpec(*gridd, figure=f)
+    gs = gridspec.GridSpec(**gridd, figure=f)
 
     # Get list of axis objects
     x = 0
     ax = list()
-    while x < gridd[0] * gridd[1]:
+    while x < gridd['nrows'] * gridd['ncols']:
         if x not in empts and x not in multz.keys():  # If this is just a normal subplot
             ax.append(f.add_subplot(gs[x]))
         elif x in multz.keys():  # If this is a subplot that spans grid elements
