@@ -1,9 +1,21 @@
+from os.path import abspath, dirname, join
+
+import numpy as np
 import pandas as pd
 import xarray as xr
-import numpy as np
+
+REPO_PATH = dirname(dirname(abspath(__file__)))
+
 
 def cytokine_data():
-    df = pd.read_csv("./liver_iri/data/cytokine_20201120.csv")
+    df = pd.read_csv(
+        join(
+            REPO_PATH,
+            'liver_iri',
+            'data',
+            'cytokine_20201120.csv'
+        )
+    )
     data = xr.DataArray(coords={
         "Patient": pd.unique(df["PID"]),
         "Visit Type": pd.unique(df["Visit Type"]),
@@ -21,4 +33,19 @@ def cytokine_data():
 
     for rrow in df.iterrows():
         data.loc[rrow[1]["PID"], rrow[1]["Visit Type"], :] = rrow[1][6:]
+    return data
+
+
+def import_meta():
+    data = pd.read_csv(
+        join(
+            REPO_PATH,
+            'liver_iri',
+            'data',
+            'patient_meta.csv'
+        ),
+        index_col=0,
+    )
+    data.index = data.index.astype(str)
+
     return data
