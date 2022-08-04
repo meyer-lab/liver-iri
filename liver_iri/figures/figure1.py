@@ -3,11 +3,9 @@ import pandas as pd
 import xarray as xr
 import numpy as np
 from tensorpack import perform_CP
-from matplotlib import gridspec, pyplot as plt
 import seaborn as sns
 
 from .common import getSetup
-from ..tensor import get_factors
 from ..utils import reorder_table
 
 
