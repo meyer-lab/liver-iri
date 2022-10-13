@@ -4,10 +4,9 @@ import pandas as pd
 import numpy as np
 from sklearn.utils import resample
 from sklearn.preprocessing import LabelEncoder, scale
-from tensorpack import perform_CP
 
 from .common import getSetup
-from ..dataimport import cytokine_data, import_meta
+from ..dataimport import import_meta
 from ..tensor import OPTIMAL_COMPONENTS, get_factors
 from ..predict import predict_categorical, predict_continuous
 
@@ -25,6 +24,7 @@ TRANSLATIONS = {
     'postrepiri': 'LIRI'
 }
 N_BOOTSTRAP = 30
+
 
 def get_accuracies(factors, meta):
     encoder = LabelEncoder()
