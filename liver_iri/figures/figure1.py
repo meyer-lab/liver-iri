@@ -2,7 +2,8 @@ from ..dataimport import cytokine_data
 import pandas as pd
 import xarray as xr
 import numpy as np
-from tensorpack import perform_CP
+from tensorpack import perform_CP, reorient_factors
+from tensorly.cp_tensor import cp_flip_sign
 import seaborn as sns
 
 from .common import getSetup
@@ -10,12 +11,15 @@ from ..utils import reorder_table
 
 
 def makeFigure():
-    data = cytokine_data()
+    data = cytokine_data(None, log_scaling=True, uniform_lod=True)
     return makeComponentPlot(data, 8, ["Patient", "Cytokine"])
 
 
 def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
     cp = perform_CP(data.to_numpy(), rank)
+    cp = cp_flip_sign(cp)
+    cp = reorient_factors(cp)
+
     ddims = len(data.coords)
     axes_names = list(data.coords)
 

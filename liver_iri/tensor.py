@@ -6,8 +6,9 @@ from .dataimport import cytokine_data
 
 OPTIMAL_COMPONENTS = 9
 
+
 def get_factors(rank=9):
-    data = cytokine_data()
+    data = cytokine_data(None, log_scaling=True, uniform_lod=True)
     cp = perform_CP(data.values, rank)
     factors = pd.DataFrame(
         cp.factors[0],

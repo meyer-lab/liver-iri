@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
+from tensorpack import perform_CP
 
 from .common import getSetup
 from ..dataimport import import_meta
@@ -9,7 +10,7 @@ from ..tensor import get_factors
 
 
 def makeFigure():
-    factor_count = np.arange(1, 16)
+    factor_count = np.arange(1, 11)
     accuracies = pd.Series(index=factor_count, dtype=float)
 
     meta = import_meta()
