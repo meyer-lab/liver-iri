@@ -2,13 +2,34 @@ from os.path import abspath, dirname, join
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import scale, power_transform
 import xarray as xr
 
 REPO_PATH = dirname(dirname(abspath(__file__)))
+OPTIMAL_SCALING = 1E-1
 
 
 # noinspection PyArgumentList
-def cytokine_data(column=None, uniform_lod=False, log_scaling=True):
+def cytokine_data(column=None, uniform_lod=True, scaling=None,
+                  mean_center=True):
+    """
+    Import cytokine data into tensor form.
+
+    Parameters:
+        column (str, default:None): normalizes unique values in provided column
+            independently
+        uniform_lod (bool, default:True): enforces uniform limit of detection
+        scaling (str, default:None): specifies scaling transformation to use
+        mean_center (bool, default:True): sets zero-mean, variance one
+
+    Returns:
+        xarray.Dataset: cytokine data in tensor form
+    """
+    if scaling is not None:
+        if scaling not in ['log', 'power', 'reciprocal']:
+            raise AssertionError(
+                '"scaling" parameter must be "log", "power", or "reciprocal"'
+            )
     if uniform_lod:
         print('Uniform LOD enforced; "column" argument is ignored')
         column = None
@@ -21,12 +42,13 @@ def cytokine_data(column=None, uniform_lod=False, log_scaling=True):
             'cytokine_20201120.csv'
         )
     )
+
     data = xr.DataArray(coords={
         "Patient": pd.unique(df["PID"]),
-        "Visit Type": pd.unique(df["Visit Type"]),
+        "Cytokine Timepoint": pd.unique(df["Visit Type"]),
         "Cytokine": df.columns[6:],
         },
-        dims=["Patient", "Visit Type", "Cytokine"]
+        dims=["Patient", "Cytokine Timepoint", "Cytokine"]
     )
 
     if uniform_lod:
@@ -49,38 +71,145 @@ def cytokine_data(column=None, uniform_lod=False, log_scaling=True):
                 group_cytokines.where(group_cytokines > 0),
                 axis=0
             )
-            group_cytokines = np.clip(
+            group_cytokines[:] = np.clip(
                 group_cytokines,
                 col_min,
                 np.inf,
                 axis=1
             )
 
-            if log_scaling:
-                group_cytokines = np.log(group_cytokines)
+            if scaling is not None:
+                if scaling == 'power':
+                    group_cytokines[:] = power_transform(group_cytokines)
+                elif scaling == 'log':
+                    group_cytokines[:] = np.log(group_cytokines)
+                elif scaling == 'reciprocal':
+                    group_cytokines[:] = np.reciprocal(group_cytokines)
 
-            group_cytokines -= np.mean(group_cytokines, axis=0)
-            group_cytokines /= np.std(group_cytokines, axis=0)
+            if mean_center:
+                group_cytokines -= np.mean(group_cytokines, axis=0)
+                group_cytokines /= np.std(group_cytokines, axis=0)
+
             df.loc[group_cytokines.index, group_cytokines.columns] = \
                 group_cytokines
     else:
-        # log standardize data
         col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:]>0), axis=0)
         df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
 
-        if log_scaling:
-            df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
+        if scaling is not None:
+            if scaling == 'power':
+                df.iloc[:, 6:] = power_transform(df.iloc[:, 6:])
+            elif scaling == 'log':
+                df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
+            elif scaling == 'reciprocal':
+                df.iloc[:, 6:] = np.reciprocal(df.iloc[:, 6:])
 
-        df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
-        df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
+        if mean_center:
+            df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
+            df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
 
     for rrow in df.iterrows():
         data.loc[rrow[1]["PID"], rrow[1]["Visit Type"], :] = rrow[1][6:]
 
-    return data
+    return data.to_dataset(name='Cytokine Measurements')
+
+
+def rna_data(log_scaling=True, normalization='full'):
+    """
+    Import RNA data into tensor form.
+
+    Parameters:
+        log_scaling (bool, default:True): log-transforms RNA expression
+        normalization (str, default:'full'): specifies whether to z-score
+            RNA measurements altogether or individually by time point
+
+    Returns:
+        xarray.Dataset: RNA expression data in tensor form
+    """
+    if normalization:
+        if normalization.lower() not in ['full', 'box']:
+            raise ValueError('normalization must be "False", "full", or "box"')
+
+    df = pd.read_csv(
+        join(
+            REPO_PATH,
+            'liver_iri',
+            'data',
+            'tpm_higher_frequency.txt'
+        ),
+        index_col=0
+    )
+
+    patients = df.columns.str[:-4].unique()
+    # patients = patients.drop(['96', '98'])
+    data = xr.DataArray(
+        coords={
+            "Patient": patients,
+            "Gene Timepoint": ['Pre-Op', 'Post-Op'],
+            "Gene": df.index,
+        },
+        dims=["Patient", "Gene Timepoint", "Gene"]
+    )
+
+    if log_scaling:
+        df[:] = power_transform(df)
+
+    if normalization == 'full':
+        df[:] = scale(df)
+
+    if normalization == 'Box':
+        for box in ['Bx1', 'Bx2']:
+            box_df = df.loc[:, df.columns.str.contains(box)]
+            df.loc[:, df.columns.str.contains(box)] = scale(box_df)
+
+    for patient in patients:
+        data.loc[patient, :, :] = df.loc[:, df.columns.str.contains(patient)].T
+
+    return data.to_dataset(name='RNA Measurements')
+
+
+def build_coupled_tensor(scaling=OPTIMAL_SCALING,
+                         cytokine_params=None,
+                         rna_params=None):
+    """
+    Builds coupled cytokine and RNA tensors.
+
+    Parameters:
+        scaling (float, default:OPTIMAL_SCALING): variance scaling between RNA
+            and cytokine tensors; values > 1 increase RNA emphasis
+        cytokine_params (dict, default:None): parameters to be passed to
+            cytokine tensor creation; refer to cytokine_data
+        rna_params (dict, default:None): parameters to be passed to RNA tensor
+            creation; refer to rna_data
+
+    Returns:
+        xarray.Dataset: Coupled RNA and cytokine tensors
+    """
+    if cytokine_params is not None and not isinstance(cytokine_params, dict):
+        raise ValueError('cytokine_params must be a dict')
+
+    if rna_params is not None and not isinstance(rna_params, dict):
+        raise ValueError('rna_params must be a dict')
+
+    if cytokine_params is None:
+        cytokine_params = {}
+
+    if rna_params is None:
+        rna_params = {}
+
+    rna = rna_data(**rna_params) * scaling
+    cytokine = cytokine_data(**cytokine_params)
+
+    return xr.merge([rna, cytokine])
 
 
 def import_meta():
+    """
+    Imports patient meta-data.
+
+    Returns:
+        pandas.DataFrame: patient meta-data
+    """
     data = pd.read_csv(
         join(
             REPO_PATH,
@@ -91,5 +220,6 @@ def import_meta():
         index_col=0,
     )
     data.index = data.index.astype(str)
+    data = data.drop('142')
 
     return data
