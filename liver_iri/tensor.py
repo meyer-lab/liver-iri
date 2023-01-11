@@ -1,18 +1,47 @@
 import numpy as np
-import pandas as pd
-from tensorpack import perform_CP
+from tensorpack.coupled import CoupledTensor
 
-from .dataimport import cytokine_data
+from liver_iri.dataimport import build_coupled_tensor
 
-OPTIMAL_COMPONENTS = 9
+OPTIMAL_RANK = 6
 
 
-def get_factors(rank=9):
-    data = cytokine_data(None, log_scaling=True, uniform_lod=True)
-    cp = perform_CP(data.values, rank)
-    factors = pd.DataFrame(
-        cp.factors[0],
-        index=data.Patient.values,
-        columns=np.arange(1, rank + 1)
-    )
-    return factors
+def get_factors(data=None, rank=OPTIMAL_RANK, nonneg=False):
+    """
+    Runs coupled CP and returns factor matrices.
+
+    Parameters:
+        data (xr.Dataset, default: None): coupled tensors to factorize; if
+            'None', builds default coupled tensor (see
+            dataimport.build_coupled_tensor)
+        rank (int, default: OPTIMAL_RANK): tensor factorization rank
+        nonneg (bool, default: False): runs non-negative factorization
+
+    Returns:
+        factors (pd.DataFrame): patient factors for provided data
+        decomposer (CoupledTensor): decomposition object
+    """
+    np.random.seed(215)
+    rank = int(rank)
+
+    if data is None:
+        data = build_coupled_tensor()
+
+    if nonneg:
+        decomposer = CoupledTensor(
+            data,
+            rank
+        )
+        decomposer.initialize(method='svd')
+    else:
+        decomposer = CoupledTensor(
+            data,
+            rank
+        )
+        decomposer.initialize(method='randomized_svd')
+
+    decomposer.fit(nonneg=nonneg, tol=1E-6, maxiter=2500)
+    decomposer.normalize_factors()
+    factors = decomposer.x._Patient.to_pandas()
+
+    return factors, decomposer
