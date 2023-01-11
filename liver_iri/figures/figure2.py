@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from tensorpack import perform_CP
 
 from .common import getSetup
-from ..dataimport import import_meta
-from ..predict import predict_categorical
-from ..tensor import get_factors
+from ..dataimport import build_coupled_tensor, import_meta
+from ..predict import predict_categorical_svc
+from ..tensor import run_coupled
 
 
 def makeFigure():
@@ -20,11 +19,15 @@ def makeFigure():
     encoder = LabelEncoder()
     encoded = encoder.fit_transform(labels)
 
+    data = build_coupled_tensor()
     for n_factors in factor_count:
-        factors = get_factors(n_factors)
+        factors, _ = run_coupled(
+            data,
+            rank=n_factors
+        )
 
-        data = factors.loc[labels.index, :]
-        score, _ = predict_categorical(data, encoded)
+        factors = factors.loc[labels.index, :]
+        score, _ = predict_categorical_svc(factors, encoded)
         accuracies.loc[n_factors] = score
 
     fig_size = (6, 3)
