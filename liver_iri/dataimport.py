@@ -8,7 +8,7 @@ REPO_PATH = dirname(dirname(abspath(__file__)))
 
 
 # noinspection PyArgumentList
-def cytokine_data(column=None, uniform_lod=False, log_scaling=True):
+def cytokine_data(column=None, uniform_lod=False, log_scaling=True, mean_center=False):
     if uniform_lod:
         print('Uniform LOD enforced; "column" argument is ignored')
         column = None
@@ -59,8 +59,10 @@ def cytokine_data(column=None, uniform_lod=False, log_scaling=True):
             if log_scaling:
                 group_cytokines = np.log(group_cytokines)
 
-            group_cytokines -= np.mean(group_cytokines, axis=0)
-            group_cytokines /= np.std(group_cytokines, axis=0)
+            if mean_center:
+                group_cytokines -= np.mean(group_cytokines, axis=0)
+                group_cytokines /= np.std(group_cytokines, axis=0)
+
             df.loc[group_cytokines.index, group_cytokines.columns] = \
                 group_cytokines
     else:
@@ -71,13 +73,14 @@ def cytokine_data(column=None, uniform_lod=False, log_scaling=True):
         if log_scaling:
             df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
 
-        df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
-        df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
+        if mean_center:
+            df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
+            df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
 
     for rrow in df.iterrows():
         data.loc[rrow[1]["PID"], rrow[1]["Visit Type"], :] = rrow[1][6:]
 
-    return data
+    return data.to_dataset(name='Cytokine Measurements')
 
 
 def import_meta():
