@@ -257,7 +257,7 @@ def import_meta():
             REPO_PATH,
             'liver_iri',
             'data',
-            'patient_meta_v2.csv'
+            'patient_meta.csv'
         ),
         index_col=0,
     )
