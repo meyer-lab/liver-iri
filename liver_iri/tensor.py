@@ -5,7 +5,7 @@ import xarray as xr
 
 from liver_iri.dataimport import build_coupled_tensor
 
-OPTIMAL_RANK = 6
+OPTIMAL_RANK = 4
 
 
 def run_cp(data, rank=OPTIMAL_RANK):
