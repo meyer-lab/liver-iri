@@ -153,7 +153,7 @@ def rna_data(log_scaling=True, normalization='full', drop_unknown=True, shuffle=
             REPO_PATH,
             'liver_iri',
             'data',
-            'tpm_higher_frequency.txt'
+            'rna_tpm.txt'
         ),
         index_col=0
     )
