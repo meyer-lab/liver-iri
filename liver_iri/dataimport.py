@@ -9,8 +9,36 @@ REPO_PATH = dirname(dirname(abspath(__file__)))
 OPTIMAL_SCALING = 1
 
 
+def transform_data(data, transform='log'):
+    """
+    Applies transform to provided data.
+
+    Args:
+        data (pd.DataFrame): data to transform
+        transform (str, default:'log'): transform to apply
+
+    Returns:
+        pd.DataFrame: transformed version of provided data
+    """
+    if (not isinstance(transform, str)) or \
+            (transform.lower() not in ['log', 'power', 'reciprocal']):
+        raise ValueError(
+            '"transform" parameter must be "log", "power", or "reciprocal"'
+        )
+    transform = transform.lower()
+
+    if transform == 'power':
+        data[:] = power_transform(data)
+    elif transform == 'log':
+        data[:] = np.log(data)
+    elif transform == 'reciprocal':
+        data[:] = np.reciprocal(data)
+
+    return data
+
+
 # noinspection PyArgumentList
-def cytokine_data(column=None, uniform_lod=True, scaling='log',
+def cytokine_data(column=None, uniform_lod=True, transform='log',
                   mean_center=True, drop_unknown=True, drop_pv=True):
     """
     Import cytokine data into tensor form.
@@ -19,7 +47,7 @@ def cytokine_data(column=None, uniform_lod=True, scaling='log',
         column (str, default:None): normalizes unique values in provided column
             independently
         uniform_lod (bool, default:True): enforces uniform limit of detection
-        scaling (str, default:None): specifies scaling transformation to use
+        transform (str, default:None): specifies transformation to use
         mean_center (bool, default:True): sets zero-mean, variance one
         drop_unknown (bool, default:True): drop patients without metadata
         drop_pv (bool, default:True): drop measurements taken from portal vein
@@ -27,15 +55,6 @@ def cytokine_data(column=None, uniform_lod=True, scaling='log',
     Returns:
         xarray.Dataset: cytokine data in tensor form
     """
-    if scaling is not None:
-        if scaling not in ['log', 'power', 'reciprocal']:
-            raise AssertionError(
-                '"scaling" parameter must be "log", "power", or "reciprocal"'
-            )
-    # if uniform_lod:
-    #     print('Uniform LOD enforced; "column" argument is ignored')
-    #     column = None
-
     df = pd.read_csv(
         join(
             REPO_PATH,
@@ -94,13 +113,8 @@ def cytokine_data(column=None, uniform_lod=True, scaling='log',
                 axis=1
             )
 
-            if scaling is not None:
-                if scaling == 'power':
-                    group_cytokines[:] = power_transform(group_cytokines)
-                elif scaling == 'log':
-                    group_cytokines[:] = np.log(group_cytokines)
-                elif scaling == 'reciprocal':
-                    group_cytokines[:] = np.reciprocal(group_cytokines)
+            if transform is not None:
+                group_cytokines[:] = transform_data(group_cytokines, transform)
 
             if mean_center:
                 group_cytokines -= np.mean(group_cytokines, axis=0)
@@ -112,13 +126,8 @@ def cytokine_data(column=None, uniform_lod=True, scaling='log',
         col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:]>0), axis=0)
         df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
 
-        if scaling is not None:
-            if scaling == 'power':
-                df.iloc[:, 6:] = power_transform(df.iloc[:, 6:])
-            elif scaling == 'log':
-                df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
-            elif scaling == 'reciprocal':
-                df.iloc[:, 6:] = np.reciprocal(df.iloc[:, 6:])
+        if transform is not None:
+            df.iloc[:, 6:] = transform_data(df.iloc[:, 6:], transform)
 
         if mean_center:
             df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
@@ -130,13 +139,13 @@ def cytokine_data(column=None, uniform_lod=True, scaling='log',
     return data.to_dataset(name='Cytokine Measurements')
 
 
-def rna_data(log_scaling=True, normalization='full', drop_unknown=True, shuffle=None):
+def rna_data(transform='power', mean_center='full', drop_unknown=True, shuffle=None):
     """
     Import RNA data into tensor form.
 
     Parameters:
-        log_scaling (bool, default:True): log-transforms RNA expression
-        normalization (str, default:'full'): specifies whether to z-score
+        transform (bool, default:True): log-transforms RNA expression
+        mean_center (str, default:'full'): specifies whether to z-score
             RNA measurements altogether or individually by time point
         shuffle (rng, default:None): shuffles rna data
         drop_unknown (bool, default:True): drop patients without metadata
@@ -144,9 +153,11 @@ def rna_data(log_scaling=True, normalization='full', drop_unknown=True, shuffle=
     Returns:
         xarray.Dataset: RNA expression data in tensor form
     """
-    if normalization:
-        if normalization.lower() not in ['full', 'box']:
-            raise ValueError('normalization must be "False", "full", or "box"')
+    if mean_center is not None:
+        if (not isinstance(mean_center, str)) or \
+                mean_center.lower() not in ['full', 'box']:
+            raise ValueError('mean_center must be None, "full", or "box"')
+        mean_center = mean_center.lower()
 
     df = pd.read_csv(
         join(
@@ -176,13 +187,12 @@ def rna_data(log_scaling=True, normalization='full', drop_unknown=True, shuffle=
         dims=["Patient", "Gene Timepoint", "Gene"]
     )
 
-    if log_scaling:
-        df[:] = power_transform(df)
+    if transform is not None:
+        df[:] = transform_data(df, transform)
 
-    if normalization == 'full':
+    if mean_center == 'full':
         df[:] = scale(df, axis=1)
-
-    if normalization == 'Box':
+    elif mean_center == 'box':
         for box in ['Bx1', 'Bx2']:
             box_df = df.loc[:, df.columns.str.contains(box)]
             df.loc[:, df.columns.str.contains(box)] = scale(box_df, axis=1)
