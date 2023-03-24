@@ -4,8 +4,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import ElasticNet, ElasticNetCV, LogisticRegression, \
     LogisticRegressionCV
-from sklearn.metrics import balanced_accuracy_score, \
-    precision_recall_fscore_support
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, roc_curve
 from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
     RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.svm import SVC
@@ -13,56 +12,56 @@ from tensorpack.tpls import calcR2X, tPLS
 import xarray as xr
 
 OPTIMAL_TPLS = 4
-skf = RepeatedStratifiedKFold(
-    n_splits=5,
-    n_repeats=5
+rskf = RepeatedStratifiedKFold(
+    n_repeats=5,
+    n_splits=10
 )
 skf = StratifiedKFold(
-    n_splits=5
+    n_splits=10
 )
 
 
-def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS):
-    tensors = [
-        data['Cytokine Measurements'].to_numpy(),
-        data['RNA Measurements'].to_numpy()
-    ]
-    patients_both = np.array(
-        [
-            np.isfinite(tensors[0]).all(axis=1).all(axis=1),
-            np.isfinite(tensors[1]).all(axis=1).all(axis=1)
-        ]
-    ).all(axis=0)
-    data = data.sel(Patient=data.Patient.values[patients_both])
-    labels = labels.loc[data.Patient.values]
-
-    tensors = [
-        data['Cytokine Measurements'].to_numpy(),
-        data['RNA Measurements'].to_numpy()
-    ]
+def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS, drop_missing=True):
+    if drop_missing:
+        tensors = [data[var].to_numpy() for var in data.data_vars]
+        patients_all = np.array(
+            [np.isfinite(tensor).any(axis=1).any(axis=1) for tensor in tensors]
+        ).all(axis=0)
+        data = data.sel(Patient=data.Patient.values[patients_all])
+        labels = labels.loc[data.Patient.values]
+        tensors = [data[var].to_numpy() for var in data.data_vars]
+    else:
+        tensors = [data[var].to_numpy() for var in data.data_vars]
+        for index, tensor in enumerate(tensors):
+            all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
+            tensors[index][all_missing, :, :] = 0
 
     np.random.seed(42)
     tpls = ctPLS(n_components=rank)
 
-    loo = LeaveOneOut()
-    predicted = np.zeros(labels.shape)
-    for train_index, test_index in loo.split(labels):
+    predicted = pd.Series(0, index=labels.index)
+    for train_index, test_index in skf.split(tensors[0], labels):
         train_data = [
-            tensors[0][train_index, :, :],
-            tensors[1][train_index, :, :]
+            tensor[train_index, :, :] for tensor in tensors
         ]
         test_data = [
-            tensors[0][test_index, :, :],
-            tensors[1][test_index, :, :]
+            tensor[test_index, :, :] for tensor in tensors
         ]
-        train_labels = labels.iloc[train_index, :].values
+        train_labels = labels.iloc[train_index].values
 
         tpls.fit(train_data, train_labels)
-        predicted[test_index, :] = tpls.predict(test_data)
+        train_predicted = tpls.predict(train_data)
+        test_predicted = tpls.predict(test_data)
 
-    acc = balanced_accuracy_score(
-        labels.values.argmax(axis=1),
-        predicted.argmax(axis=1)
+        fpr, tpr, thresh = roc_curve(train_labels, train_predicted)
+        best_idx = np.argmax(tpr - fpr)
+        predicted.iloc[test_index] = (
+                test_predicted >= thresh[best_idx]
+        ).astype(int).flatten()
+
+    acc = accuracy_score(
+        labels,
+        predicted
     )
     tpls.fit(tensors, labels.values)
 
