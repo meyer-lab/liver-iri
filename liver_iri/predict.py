@@ -3,14 +3,18 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import ElasticNet, ElasticNetCV, LogisticRegression, \
     LogisticRegressionCV
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import balanced_accuracy_score, \
+    precision_recall_fscore_support
 from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
-    RepeatedStratifiedKFold
+    RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.svm import SVC
 
-skf = RepeatedStratifiedKFold(
+rskf = RepeatedStratifiedKFold(
     n_splits=5,
     n_repeats=5
+)
+skf = StratifiedKFold(
+    n_splits=5
 )
 
 
@@ -77,6 +81,8 @@ def predict_categorical(data, labels, return_coef=False):
             optimized to predict provided data and labels
         return_coef (numpy.array): LR coefficients for each feature
     """
+    np.random.seed(21517)
+
     if isinstance(labels, pd.Series):
         labels = labels.reset_index(drop=True)
     else:
@@ -98,9 +104,9 @@ def predict_categorical(data, labels, return_coef=False):
         solver="saga",
         penalty="elasticnet",
         n_jobs=-1,
-        cv=skf,
+        cv=rskf,
         max_iter=100000,
-        scoring='balanced_accuracy',
+        scoring='accuracy',
         multi_class='ovr'
     )
     model.fit(data, labels)
@@ -120,6 +126,45 @@ def predict_categorical(data, labels, return_coef=False):
         return np.max(scores), model, coef
     else:
         return np.max(scores), model
+
+
+def get_probabilities(model, data, labels):
+    """
+    Returns probabilities of positive classification via cross-validation.
+
+    Parameters:
+        model (sklearn.BaseEstimator): sklearn model; must have predict_proba()
+        data (pandas.DataFrame): Data to predict
+        labels (pandas.Series): Labels for provided data
+
+    Returns:
+        pd.Series: probability of positive class for each sample
+    """
+    np.random.seed(215)
+
+    if isinstance(labels, pd.Series):
+        labels = labels.reset_index(drop=True)
+    else:
+        labels = pd.Series(labels)
+
+    labels = labels[labels != 'Unknown']
+
+    if isinstance(data, pd.Series):
+        data = data.iloc[labels.index]
+        data = data.values.reshape(-1, 1)
+    elif isinstance(data, pd.DataFrame):
+        data = data.iloc[labels.index, :].values
+    else:
+        data = data[labels.index, :]
+
+    probabilities = np.zeros(data.shape[0])
+    for train_index, test_index in skf.split(data, labels):
+        model.fit(data[train_index, :], labels[train_index])
+        probabilities[test_index] = model.predict_proba(
+            data[test_index, :]
+        )[:, 1]
+
+    return probabilities
 
 
 def optimize_parameters(classifier, data, labels, params):
@@ -143,7 +188,7 @@ def optimize_parameters(classifier, data, labels, params):
     for index, param in enumerate(params[key]):
         model = classifier(**{key: param})
         scores = []
-        for train_index, test_index in skf.split(data, labels):
+        for train_index, test_index in rskf.split(data, labels):
             model.fit(
                 data.iloc[train_index, :],
                 labels.iloc[train_index]
@@ -199,15 +244,15 @@ def predict_categorical_rf(data, labels, return_coef=False):
         {'n_estimators': np.arange(50, 160, 10)}
     )
     model = RandomForestClassifier(**best_params)
-    scores = np.zeros(shape=(skf.cvargs['n_splits'] * skf.n_repeats))
+    scores = np.zeros(shape=(rskf.cvargs['n_splits'] * rskf.n_repeats))
     coefs = np.zeros(
         shape=(
-            skf.cvargs['n_splits'] * skf.n_repeats,
+            rskf.cvargs['n_splits'] * rskf.n_repeats,
             data.shape[1]
         )
     )
     i = 0
-    for train_index, test_index in skf.split(data, labels):
+    for train_index, test_index in rskf.split(data, labels):
         model.fit(
             data.iloc[train_index, :],
             labels.iloc[train_index]
@@ -267,9 +312,9 @@ def predict_categorical_svc(data, labels):
         {'C': np.logspace(-4, 4, 9)}
     )
     model = SVC(**best_params)
-    scores = np.zeros(shape=(skf.cvargs['n_splits'] * skf.n_repeats))
+    scores = np.zeros(shape=(rskf.cvargs['n_splits'] * rskf.n_repeats))
     i = 0
-    for train_index, test_index in skf.split(data, labels):
+    for train_index, test_index in rskf.split(data, labels):
         model.fit(
             data.iloc[train_index, :],
             labels.iloc[train_index]
