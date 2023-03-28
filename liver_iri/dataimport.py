@@ -255,22 +255,69 @@ def build_coupled_tensor(
     return xr.merge([rna, cytokine])
 
 
-def import_meta():
+def import_meta(balanced=False):
     """
     Imports patient meta-data.
 
     Returns:
         pandas.DataFrame: patient meta-data
     """
+    if balanced:
+        file_name = 'balanced_meta.csv'
+    else:
+        file_name = 'patient_meta.csv'
+
     data = pd.read_csv(
         join(
             REPO_PATH,
             'liver_iri',
             'data',
-            'patient_meta.csv'
+            file_name
         ),
         index_col=0,
     )
     data.index = data.index.astype(str)
 
     return data
+
+
+def import_lfts(score=None, transform='log'):
+    """
+    Imports liver function test scores.
+
+    Parameters:
+        score (str, default:None): liver function test to return; if 'None' is
+            passed, returns all liver function tests; if provided, must be one
+            of 'alt', 'ast', 'inr', or 'tbil'
+        transform (str, default:'log'): transform to apply
+
+    Returns:
+        pandas.DataFrame: requested liver function test scores
+    """
+    lft = pd.read_csv(
+        join(
+            REPO_PATH,
+            'liver_iri',
+            'data',
+            'lft_scores.csv'
+        ),
+        index_col=0
+    )
+    lft.loc[:, ~lft.columns.str.contains('inr')] = transform_data(
+        lft.loc[
+            :,
+            ~lft.columns.str.contains('inr')
+        ],
+        transform
+    )
+    lft.index = lft.index.astype(str)
+
+    if score is not None:
+        score = score.lower()
+        if score not in ['alt', 'ast', 'inr', 'tbil']:
+            raise ValueError(
+                'score must be one of "alt", "ast", "inr", or "tbil"'
+            )
+        lft = lft.loc[:, lft.columns.str.contains(score)]
+
+    return lft
