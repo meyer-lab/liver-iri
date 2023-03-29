@@ -2,29 +2,31 @@ from ..dataimport import cytokine_data
 import pandas as pd
 import xarray as xr
 import numpy as np
-from tensorpack import perform_CP, reorient_factors
-from tensorly.cp_tensor import cp_flip_sign
 import seaborn as sns
 
 from .common import getSetup
+from ..tensor import run_cp
 from ..utils import reorder_table
 
 
 def makeFigure():
-    data = cytokine_data(None, log_scaling=True, uniform_lod=True)
+    data = cytokine_data()
     return makeComponentPlot(data, 8, ["Patient", "Cytokine"])
 
 
 def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
-    cp = perform_CP(data.to_numpy(), rank)
-    cp = cp_flip_sign(cp)
-    cp = reorient_factors(cp)
+    cp = run_cp(data, rank)
 
     ddims = len(data.coords)
     axes_names = list(data.coords)
 
-    factors = [pd.DataFrame(cp[1][rr], columns=[f"Cmp. {i}" for i in np.arange(1, rank + 1)],
-                            index=data.coords[axes_names[rr]]) for rr in range(ddims)]
+    factors = [
+        pd.DataFrame(
+            cp[1][rr],
+            columns=[f"Cmp. {i}" for i in np.arange(1, rank + 1)],
+            index=data.coords[axes_names[rr]]
+        ) for rr in range(ddims)
+    ]
 
     for r_ax in reorder:
         if isinstance(r_ax, int):

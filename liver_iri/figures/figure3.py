@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder, scale
 
 from .common import getSetup
 from ..dataimport import import_meta
-from ..tensor import OPTIMAL_COMPONENTS, get_factors
+from ..tensor import run_coupled
 from ..predict import predict_categorical, predict_continuous
 
 warnings.filterwarnings('ignore')
@@ -136,7 +136,7 @@ def plot_errorbars(means, devs, ax):
 
 
 def makeFigure():
-    factors = get_factors(OPTIMAL_COMPONENTS)
+    factors, _ = run_coupled()
     meta = import_meta()
 
     accuracies, q2ys, models = get_accuracies(factors, meta)
