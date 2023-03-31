@@ -192,7 +192,8 @@ def rna_data(transform='power', mean_center='full', drop_unknown=True, shuffle=N
 
     if mean_center == 'full':
         df[:] = scale(df, axis=1)
-    elif mean_center == 'box':
+
+    if normalization == 'box':
         for box in ['Bx1', 'Bx2']:
             box_df = df.loc[:, df.columns.str.contains(box)]
             df.loc[:, df.columns.str.contains(box)] = scale(box_df, axis=1)

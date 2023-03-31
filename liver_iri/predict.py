@@ -1,3 +1,4 @@
+from cmtf_pls.cmtf import ctPLS
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -8,14 +9,226 @@ from sklearn.metrics import balanced_accuracy_score, \
 from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
     RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.svm import SVC
+from tensorpack.tpls import calcR2X, tPLS
+import xarray as xr
 
-rskf = RepeatedStratifiedKFold(
+OPTIMAL_TPLS = 4
+skf = RepeatedStratifiedKFold(
     n_splits=5,
     n_repeats=5
 )
 skf = StratifiedKFold(
     n_splits=5
 )
+
+
+def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS):
+    tensors = [
+        data['Cytokine Measurements'].to_numpy(),
+        data['RNA Measurements'].to_numpy()
+    ]
+    patients_both = np.array(
+        [
+            np.isfinite(tensors[0]).all(axis=1).all(axis=1),
+            np.isfinite(tensors[1]).all(axis=1).all(axis=1)
+        ]
+    ).all(axis=0)
+    data = data.sel(Patient=data.Patient.values[patients_both])
+    labels = labels.loc[data.Patient.values]
+
+    tensors = [
+        data['Cytokine Measurements'].to_numpy(),
+        data['RNA Measurements'].to_numpy()
+    ]
+
+    np.random.seed(42)
+    tpls = ctPLS(n_components=rank)
+
+    loo = LeaveOneOut()
+    predicted = np.zeros(labels.shape)
+    for train_index, test_index in loo.split(labels):
+        train_data = [
+            tensors[0][train_index, :, :],
+            tensors[1][train_index, :, :]
+        ]
+        test_data = [
+            tensors[0][test_index, :, :],
+            tensors[1][test_index, :, :]
+        ]
+        train_labels = labels.iloc[train_index, :].values
+
+        tpls.fit(train_data, train_labels)
+        predicted[test_index, :] = tpls.predict(test_data)
+
+    acc = balanced_accuracy_score(
+        labels.values.argmax(axis=1),
+        predicted.argmax(axis=1)
+    )
+    tpls.fit(tensors, labels.values)
+
+    return tpls, acc, data
+
+
+def run_tpls_classification(data, labels, rank=OPTIMAL_TPLS):
+    """
+    Runs CP_PLSR on provided data and labels.
+
+    Parameters:
+        data:
+        labels:
+        rank:
+
+    Returns:
+    """
+    labels.index = labels.index.astype(str)
+    shared = list(set(data.Patient.values) & set(labels.index.astype(str)))
+    data = data.sel(Patient=list(shared))
+    labels = labels.loc[shared, :]
+
+    if isinstance(data, xr.Dataset):
+        data = data.to_array().squeeze()
+        data = data.to_numpy()
+    elif isinstance(data, xr.DataArray):
+        data = data.to_numpy()
+    elif not isinstance(data, np.ndarray):
+        raise TypeError('Unrecognized data format provided')
+
+    missing = ~np.isnan(data).any(axis=1).any(axis=1)
+    data = data[missing, :, :]
+    labels = labels.loc[missing, :]
+
+    missing_labels = np.isfinite(labels).all(axis=1).values
+    data = data[missing_labels, :, :]
+    labels = labels.loc[missing_labels, :].values
+
+    np.random.seed(42)
+    tpls = tPLS(
+        n_components=rank
+    )
+
+    predicted = np.zeros(labels.shape)
+    for train_index, test_index in skf.split(data, labels.argmax(axis=1)):
+        train_data, train_labels = data[train_index, :, :], labels[train_index, :]
+        test_data, test_labels = data[test_index, :, :], labels[test_index, :]
+
+        tpls.fit(train_data, train_labels)
+        predicted[test_index, :] = tpls.predict(test_data)
+
+    acc = balanced_accuracy_score(
+        labels.argmax(axis=1),
+        predicted.argmax(axis=1)
+    )
+
+    return tpls, acc
+
+
+def run_coupled_tpls(data, labels, rank=OPTIMAL_TPLS):
+    """
+    Runs coupled tPLS.
+    Args:
+        data:
+        labels:
+        rank:
+
+    Returns:
+    """
+    tensors = [
+        data['Cytokine Measurements'].to_numpy(),
+        data['RNA Measurements'].to_numpy()
+    ]
+    patients_both = np.array(
+        [
+            np.isfinite(tensors[0]).all(axis=1).all(axis=1),
+            np.isfinite(tensors[1]).all(axis=1).all(axis=1)
+        ]
+    ).all(axis=0)
+    tensors[0] = tensors[0][patients_both, :, :]
+    tensors[1] = tensors[1][patients_both, :, :]
+    labels = labels.loc[patients_both, :]
+
+    missing_labels = ~labels.isna().any(axis=1)
+    labels = labels.loc[missing_labels, :]
+    tensors[0] = tensors[0][missing_labels, :, :]
+    tensors[1] = tensors[1][missing_labels, :, :]
+
+    np.random.seed(42)
+    tpls = ctPLS(n_components=rank)
+
+    loo = LeaveOneOut()
+    predicted = np.zeros(labels.shape)
+    for train_index, test_index in loo.split(labels):
+        train_data = [
+            tensors[0][train_index, :, :],
+            tensors[1][train_index, :, :]
+        ]
+        test_data = [
+            tensors[0][test_index, :, :],
+            tensors[1][test_index, :, :]
+        ]
+        train_labels = labels.iloc[train_index, :].values
+
+        tpls.fit(train_data, train_labels)
+        predicted[test_index, :] = tpls.predict(test_data)
+
+    q2y = calcR2X(np.exp(labels), np.exp(predicted))
+    return tpls, q2y
+
+
+def run_tpls(data, labels, rank=OPTIMAL_TPLS):
+    """
+    Runs CP_PLSR on provided data and labels.
+
+    Parameters:
+        data:
+        labels:
+        rank:
+
+    Returns:
+    """
+    labels.index = labels.index.astype(str)
+    shared = list(set(data.Patient.values) & set(labels.index.astype(str)))
+    data = data.sel(Patient=list(shared))
+    labels = labels.loc[shared, :]
+
+    if isinstance(data, xr.Dataset):
+        data = data.to_array().squeeze()
+        data = data.to_numpy()
+    elif isinstance(data, xr.DataArray):
+        data = data.to_numpy()
+    elif not isinstance(data, np.ndarray):
+        raise TypeError('Unrecognized data format provided')
+
+    missing = ~np.isnan(data).any(axis=1).any(axis=1)
+    data = data[missing, :, :]
+    labels = labels.loc[missing, :]
+
+    missing_labels = np.isfinite(labels).all(axis=1).values
+    # missing_labels = ~labels.isna().any(axis=1)
+    data = data[missing_labels, :, :]
+    labels = labels.loc[missing_labels, :].values
+
+    np.random.seed(42)
+    # tpls = CP_PLSR(
+    #     n_components=rank,
+    #     random_state=42
+    # )
+    tpls = tPLS(
+        n_components=rank
+    )
+
+    loo = LeaveOneOut()
+    predicted = np.zeros(labels.shape)
+    for train_index, test_index in loo.split(labels):
+        train_data, train_labels = data[train_index, :, :], labels[train_index, :]
+        test_data, test_labels = data[test_index, :, :], labels[test_index, :]
+
+        tpls.fit(train_data, train_labels)
+        predicted[test_index, :] = tpls.predict(test_data)
+
+    # q2y = mean_absolute_error(labels, predicted)
+    q2y = calcR2X(np.exp(labels), np.exp(predicted))
+
+    return tpls, q2y
 
 
 def predict_continuous(data, labels):
