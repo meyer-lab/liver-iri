@@ -6,7 +6,6 @@ from sklearn.preprocessing import scale, power_transform
 import xarray as xr
 
 REPO_PATH = dirname(dirname(abspath(__file__)))
-OPTIMAL_SCALING = 1
 
 
 def transform_data(data, transform='log'):
@@ -37,29 +36,22 @@ def transform_data(data, transform='log'):
     return data
 
 
-def pv_data(column=None, uniform_lod=True, scaling='log',
-                  mean_center=True, drop_unknown=True):
+def pv_data(column=None, uniform_lod=False, transform='log', normalize=False,
+            drop_unknown=True):
     """
     Import portal vein cytokine data into tensor form.
 
     Parameters:
         column (str, default:None): normalizes unique values in provided column
             independently
-        uniform_lod (bool, default:True): enforces uniform limit of detection
-        scaling (str, default:None): specifies scaling transformation to use
-        mean_center (bool, default:True): sets zero-mean, variance one
+        uniform_lod (bool, default:False): enforces uniform limit of detection
+        transform (str, default:'log'): specifies transformation to use
+        normalize (bool, default:False): sets zero-mean, variance one
         drop_unknown (bool, default:True): drop patients without metadata
-        drop_pv (bool, default:True): drop measurements taken from portal vein
 
     Returns:
         xarray.Dataset: cytokine data in tensor form
     """
-    if scaling is not None:
-        if scaling not in ['log', 'power', 'reciprocal']:
-            raise AssertionError(
-                '"scaling" parameter must be "log", "power", or "reciprocal"'
-            )
-
     df = pd.read_csv(
         join(
             REPO_PATH,
@@ -117,15 +109,15 @@ def pv_data(column=None, uniform_lod=True, scaling='log',
                 axis=1
             )
 
-            if scaling is not None:
-                if scaling == 'power':
+            if transform is not None:
+                if transform == 'power':
                     group_cytokines[:] = power_transform(group_cytokines)
-                elif scaling == 'log':
+                elif transform == 'log':
                     group_cytokines[:] = np.log(group_cytokines)
-                elif scaling == 'reciprocal':
+                elif transform == 'reciprocal':
                     group_cytokines[:] = np.reciprocal(group_cytokines)
 
-            if mean_center:
+            if normalize:
                 group_cytokines -= np.mean(group_cytokines, axis=0)
                 group_cytokines /= np.std(group_cytokines, axis=0)
 
@@ -135,15 +127,15 @@ def pv_data(column=None, uniform_lod=True, scaling='log',
         col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:]>0), axis=0)
         df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
 
-        if scaling is not None:
-            if scaling == 'power':
+        if transform is not None:
+            if transform == 'power':
                 df.iloc[:, 6:] = power_transform(df.iloc[:, 6:])
-            elif scaling == 'log':
+            elif transform == 'log':
                 df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
-            elif scaling == 'reciprocal':
+            elif transform == 'reciprocal':
                 df.iloc[:, 6:] = np.reciprocal(df.iloc[:, 6:])
 
-        if mean_center:
+        if normalize:
             df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
             df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
 
@@ -154,17 +146,17 @@ def pv_data(column=None, uniform_lod=True, scaling='log',
 
 
 # noinspection PyArgumentList
-def cytokine_data(column=None, uniform_lod=True, transform='log',
-                  mean_center=True, drop_unknown=True, drop_pv=True):
+def cytokine_data(column=None, uniform_lod=False, transform='log',
+                  normalize=False, drop_unknown=True, drop_pv=True):
     """
     Import cytokine data into tensor form.
 
     Parameters:
         column (str, default:None): normalizes unique values in provided column
             independently
-        uniform_lod (bool, default:True): enforces uniform limit of detection
-        transform (str, default:None): specifies transformation to use
-        mean_center (bool, default:True): sets zero-mean, variance one
+        uniform_lod (bool, default:False): enforces uniform limit of detection
+        transform (str, default:'log'): specifies transformation to use
+        normalize (bool, default:False): sets zero-mean, variance one
         drop_unknown (bool, default:True): drop patients without metadata
         drop_pv (bool, default:True): drop measurements taken from portal vein
 
@@ -232,7 +224,7 @@ def cytokine_data(column=None, uniform_lod=True, transform='log',
             if transform is not None:
                 group_cytokines[:] = transform_data(group_cytokines, transform)
 
-            if mean_center:
+            if normalize:
                 group_cytokines -= np.mean(group_cytokines, axis=0)
                 group_cytokines /= np.std(group_cytokines, axis=0)
 
@@ -245,7 +237,7 @@ def cytokine_data(column=None, uniform_lod=True, transform='log',
         if transform is not None:
             df.iloc[:, 6:] = transform_data(df.iloc[:, 6:], transform)
 
-        if mean_center:
+        if normalize:
             df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
             df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
 
@@ -255,13 +247,14 @@ def cytokine_data(column=None, uniform_lod=True, transform='log',
     return data.to_dataset(name='Cytokine Measurements')
 
 
-def rna_data(transform='power', mean_center='full', drop_unknown=True, shuffle=None):
+def rna_data(transform='power', normalize='full', drop_unknown=True,
+             shuffle=None):
     """
     Import RNA data into tensor form.
 
     Parameters:
         transform (bool, default:True): log-transforms RNA expression
-        mean_center (str, default:'full'): specifies whether to z-score
+        normalize (str, default:'full'): specifies whether to z-score
             RNA measurements altogether or individually by time point
         shuffle (rng, default:None): shuffles rna data
         drop_unknown (bool, default:True): drop patients without metadata
@@ -269,11 +262,11 @@ def rna_data(transform='power', mean_center='full', drop_unknown=True, shuffle=N
     Returns:
         xarray.Dataset: RNA expression data in tensor form
     """
-    if mean_center is not None:
-        if (not isinstance(mean_center, str)) or \
-                mean_center.lower() not in ['full', 'box']:
-            raise ValueError('mean_center must be None, "full", or "box"')
-        mean_center = mean_center.lower()
+    if normalize is not None:
+        if (not isinstance(normalize, str)) or \
+                normalize.lower() not in ['full', 'box']:
+            raise ValueError('normalize must be None, "full", or "box"')
+        normalize = normalize.lower()
 
     df = pd.read_csv(
         join(
@@ -306,10 +299,10 @@ def rna_data(transform='power', mean_center='full', drop_unknown=True, shuffle=N
     if transform is not None:
         df[:] = transform_data(df, transform)
 
-    if mean_center == 'full':
+    if normalize == 'full':
         df[:] = scale(df, axis=1)
 
-    if mean_center == 'box':
+    if normalize == 'box':
         for box in ['Bx1', 'Bx2']:
             box_df = df.loc[:, df.columns.str.contains(box)]
             df.loc[:, df.columns.str.contains(box)] = scale(box_df, axis=1)
@@ -323,8 +316,19 @@ def rna_data(transform='power', mean_center='full', drop_unknown=True, shuffle=N
     return data.to_dataset(name='RNA Measurements')
 
 
-def lft_data(scaling='power', normalize=False, drop_inr=True):
-    lfts = import_lfts()
+def lft_data(transform='power', normalize=False, drop_inr=True):
+    """
+    Import LFT data into tensor form.
+
+    Parameters:
+        transform (str, default:None): specifies transformation to use
+        normalize (bool, default:False): sets zero-mean, variance one
+        drop_inr (bool, default:True): drops INR measurements
+
+    Returns:
+        xarray.Dataset: RNA expression data in tensor form
+    """
+    lfts = import_lfts(transform=transform)
     if drop_inr is not None:
         lfts = lfts.loc[:, ~lfts.columns.str.contains('inr')]
         scores = ['ast', 'alt', 'tbil']
@@ -332,19 +336,6 @@ def lft_data(scaling='power', normalize=False, drop_inr=True):
         scores = ['ast', 'alt', 'inr', 'tbil']
 
     patients = lfts.index.values
-
-    if scaling:
-        if scaling == 'log':
-            lfts += 1
-            lfts[:] = np.log(lfts)
-        elif scaling == 'power':
-            lfts[:] = power_transform(lfts)
-        else:
-            raise ValueError(
-                f'Unrecognized scaling parameter provided: {scaling}:',
-                'should be one of "log" or "power"'
-            )
-
     if normalize:
         lfts[:] = scale(lfts)
 
@@ -399,86 +390,6 @@ def build_coupled_tensors(
     return xr.merge(tensors)
 
 
-def build_triple_tensor(
-        scaling=(1, 1, 1),
-        cytokine_params=None,
-        rna_params=None,
-        lft_params=None,
-    ):
-    if cytokine_params is not None and not isinstance(cytokine_params, dict):
-        raise ValueError('cytokine_params must be a dict')
-
-    if rna_params is not None and not isinstance(rna_params, dict):
-        raise ValueError('rna_params must be a dict')
-
-    if lft_params is not None and not isinstance(lft_params, dict):
-        raise ValueError('lft_params must be a dict')
-
-    if cytokine_params is None:
-        cytokine_params = {}
-
-    if rna_params is None:
-        rna_params = {}
-
-    if lft_params is None:
-        lft_params = {}
-
-    rna = rna_data(**rna_params) * scaling[0]
-    cytokine = cytokine_data(**cytokine_params) * scaling[1]
-    lft = lft_data(**lft_params) * scaling[2]
-
-    return xr.merge([rna, cytokine, lft])
-
-
-def build_coupled_tensor(
-        scaling=OPTIMAL_SCALING,
-        cytokine_params=None,
-        rna_params=None,
-        drop_unknown=False
-    ):
-    """
-    Builds coupled cytokine and RNA tensors.
-
-    Parameters:
-        scaling (float, default:OPTIMAL_SCALING): variance scaling between RNA
-            and cytokine tensors; values > 1 increase RNA emphasis
-        cytokine_params (dict, default:None): parameters to be passed to
-            cytokine tensor creation; refer to cytokine_data
-        rna_params (dict, default:None): parameters to be passed to RNA tensor
-            creation; refer to rna_data
-        drop_unknown (bool, default:True): drop patients without metadata
-
-    Returns:
-        xarray.Dataset: Coupled RNA and cytokine tensors
-    """
-    meta = import_meta()
-
-    if cytokine_params is not None and not isinstance(cytokine_params, dict):
-        raise ValueError('cytokine_params must be a dict')
-
-    if rna_params is not None and not isinstance(rna_params, dict):
-        raise ValueError('rna_params must be a dict')
-
-    if cytokine_params is None:
-        cytokine_params = {}
-
-    if rna_params is None:
-        rna_params = {}
-
-    rna = rna_data(**rna_params) * scaling
-    cytokine = cytokine_data(**cytokine_params)
-
-    if drop_unknown:
-        rna = rna.sel(
-            Patient=sorted(list(set(meta.index) & set(rna.Patient.values)))
-        )
-        cytokine = cytokine.sel(
-            Patient=sorted(list(set(meta.index) & set(cytokine.Patient.values)))
-        )
-
-    return xr.merge([rna, cytokine])
-
-
 def import_meta(balanced=False):
     """
     Imports patient meta-data.
@@ -505,7 +416,7 @@ def import_meta(balanced=False):
     return data
 
 
-def import_lfts(score=None, transform='log'):
+def import_lfts(score=None, transform='power'):
     """
     Imports liver function test scores.
 
@@ -527,14 +438,16 @@ def import_lfts(score=None, transform='log'):
         ),
         index_col=0
     )
-    lft.loc[:, ~lft.columns.str.contains('inr')] = transform_data(
-        lft.loc[
-            :,
-            ~lft.columns.str.contains('inr')
-        ],
-        transform
-    )
-    lft.index = lft.index.astype(str)
+
+    if transform is not None:
+        lft.loc[:, ~lft.columns.str.contains('inr')] = transform_data(
+            lft.loc[
+                :,
+                ~lft.columns.str.contains('inr')
+            ],
+            transform
+        )
+        lft.index = lft.index.astype(str)
 
     if score is not None:
         score = score.lower()
