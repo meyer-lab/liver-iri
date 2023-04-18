@@ -20,7 +20,7 @@ LFT_CONVERSIONS = {
     i: f'Day {i}' for i  in LFT_TIMEPOINTS[1:]
 }
 LFT_CONVERSIONS['Opening'] = 'Pre-Op'
-TIMEPOINTS = ['PO', 'D1', 'W1', 'M1']
+TIMEPOINTS = ['PO', 'D1', 'W1', 'M1', 'LF', 'PV']
 TP_CONVERSIONS = {
     'PO': 'Pre-Op',
     'D1': '1 Day\nPost-Op',
@@ -113,7 +113,7 @@ def makeFigure():
         column=None,
         uniform_lod=False,
         transform='log',
-        mean_center=False,
+        normalize=False,
         drop_pv=False
     )
     lfts = import_lfts()

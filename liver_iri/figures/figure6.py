@@ -7,9 +7,7 @@ from scipy.stats import fisher_exact, spearmanr
 from sklearn.preprocessing import LabelEncoder
 
 from .common import getSetup
-from ..dataimport import cytokine_data, import_meta
-from ..predict import predict_categorical
-from ..utils import reorder_table
+from ..dataimport import import_meta
 
 warnings.filterwarnings('ignore')
 
@@ -171,3 +169,5 @@ def makeFigure():
         axs[0],
         y_label='Correlation p-value'
     )
+
+    return fig

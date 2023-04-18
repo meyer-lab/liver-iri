@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 from .common import getSetup
-from ..dataimport import build_coupled_tensor, import_meta
+from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import predict_categorical_svc
 from ..tensor import run_coupled
 
@@ -19,7 +19,11 @@ def makeFigure():
     encoder = LabelEncoder()
     encoded = encoder.fit_transform(labels)
 
-    data = build_coupled_tensor()
+    data = build_coupled_tensors(
+        cytokine_params={},
+        lft_params={},
+        pv_params={}
+    )
     for n_factors in factor_count:
         factors, _ = run_coupled(
             data,

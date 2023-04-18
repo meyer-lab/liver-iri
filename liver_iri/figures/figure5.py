@@ -87,7 +87,7 @@ def makeFigure():
         column=None,
         uniform_lod=False,
         transform='log',
-        mean_center=False,
+        normalize=False,
         drop_pv=False
     )
 
