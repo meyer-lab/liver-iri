@@ -4,14 +4,13 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import ElasticNet, ElasticNetCV, LogisticRegression, \
     LogisticRegressionCV
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, roc_curve
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
     RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.svm import SVC
-from tensorpack.tpls import calcR2X, tPLS
 import xarray as xr
 
-OPTIMAL_TPLS = 4
+OPTIMAL_TPLS = 2
 rskf = RepeatedStratifiedKFold(
     n_repeats=5,
     n_splits=10
@@ -21,7 +20,30 @@ skf = StratifiedKFold(
 )
 
 
-def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS, drop_missing=True):
+def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
+                                    drop_missing=True, return_proba=False):
+    """
+    Fits coupled tPLS model to provided data and labels.
+
+    Parameters:
+        data (xr.Dataset): dataset to evaluate
+        labels (pd.Series): labels to regress data against
+        rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
+        drop_missing (bool, default:True): drop patients missing ALL
+            measurements in ANY dimension
+        return_proba(bool, default:False): returns probability of each patient's
+            classification
+
+    Returns:
+        models (tuple[tPLS, LR classifier]): tuple of trained tPLS and LR model
+        acc (float): accuracy achieved over cross-validation
+        proba (pd.Series, only returns if return_proba): probability of positive
+            classification for each patient
+    """
+    shared_patients = sorted(list(set(data.Patient.values) & set(labels.index)))
+    data = data.sel(Patient=shared_patients)
+    labels = labels.loc[shared_patients]
+
     if drop_missing:
         tensors = [data[var].to_numpy() for var in data.data_vars]
         patients_all = np.array(
@@ -29,9 +51,15 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS, drop_missin
         ).all(axis=0)
         data = data.sel(Patient=data.Patient.values[patients_all])
         labels = labels.loc[data.Patient.values]
-        tensors = [data[var].to_numpy() for var in data.data_vars]
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy() for
+            var in data.data_vars
+        ]
     else:
-        tensors = [data[var].to_numpy() for var in data.data_vars]
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy() for
+            var in data.data_vars
+        ]
         for index, tensor in enumerate(tensors):
             all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
             tensors[index][all_missing, :, :] = 0
@@ -40,6 +68,10 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS, drop_missin
     tpls = ctPLS(n_components=rank)
 
     predicted = pd.Series(0, index=labels.index)
+    if return_proba:
+        probabilities = predicted.copy()
+
+    lr_model = LogisticRegression()
     for train_index, test_index in skf.split(tensors[0], labels):
         train_data = [
             tensor[train_index, :, :] for tensor in tensors
@@ -48,186 +80,32 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS, drop_missin
             tensor[test_index, :, :] for tensor in tensors
         ]
         train_labels = labels.iloc[train_index].values
-
         tpls.fit(train_data, train_labels)
-        train_predicted = tpls.predict(train_data)
-        test_predicted = tpls.predict(test_data)
 
-        fpr, tpr, thresh = roc_curve(train_labels, train_predicted)
-        best_idx = np.argmax(tpr - fpr)
-        predicted.iloc[test_index] = (
-                test_predicted >= thresh[best_idx]
-        ).astype(int).flatten()
+        train_transformed = tpls.transform(train_data)
+        test_transformed = tpls.transform(test_data)
+        lr_model.fit(train_transformed, train_labels)
+        predicted.iloc[test_index] = lr_model.predict(test_transformed)
+
+        if return_proba:
+            probabilities.iloc[test_index] = lr_model.predict_proba(
+                test_transformed
+            )[:, 1]
 
     acc = accuracy_score(
         labels,
         predicted
     )
     tpls.fit(tensors, labels.values)
-
-    return tpls, acc, data
-
-
-def run_tpls_classification(data, labels, rank=OPTIMAL_TPLS):
-    """
-    Runs CP_PLSR on provided data and labels.
-
-    Parameters:
-        data:
-        labels:
-        rank:
-
-    Returns:
-    """
-    labels.index = labels.index.astype(str)
-    shared = list(set(data.Patient.values) & set(labels.index.astype(str)))
-    data = data.sel(Patient=list(shared))
-    labels = labels.loc[shared, :]
-
-    if isinstance(data, xr.Dataset):
-        data = data.to_array().squeeze()
-        data = data.to_numpy()
-    elif isinstance(data, xr.DataArray):
-        data = data.to_numpy()
-    elif not isinstance(data, np.ndarray):
-        raise TypeError('Unrecognized data format provided')
-
-    missing = ~np.isnan(data).any(axis=1).any(axis=1)
-    data = data[missing, :, :]
-    labels = labels.loc[missing, :]
-
-    missing_labels = np.isfinite(labels).all(axis=1).values
-    data = data[missing_labels, :, :]
-    labels = labels.loc[missing_labels, :].values
-
-    np.random.seed(42)
-    tpls = tPLS(
-        n_components=rank
+    lr_model.fit(
+        tpls.transform(tensors),
+        labels
     )
 
-    predicted = np.zeros(labels.shape)
-    for train_index, test_index in skf.split(data, labels.argmax(axis=1)):
-        train_data, train_labels = data[train_index, :, :], labels[train_index, :]
-        test_data, test_labels = data[test_index, :, :], labels[test_index, :]
-
-        tpls.fit(train_data, train_labels)
-        predicted[test_index, :] = tpls.predict(test_data)
-
-    acc = balanced_accuracy_score(
-        labels.argmax(axis=1),
-        predicted.argmax(axis=1)
-    )
-
-    return tpls, acc
-
-
-def run_coupled_tpls(data, labels, rank=OPTIMAL_TPLS):
-    """
-    Runs coupled tPLS.
-    Args:
-        data:
-        labels:
-        rank:
-
-    Returns:
-    """
-    tensors = [
-        data['Cytokine Measurements'].to_numpy(),
-        data['RNA Measurements'].to_numpy()
-    ]
-    patients_both = np.array(
-        [
-            np.isfinite(tensors[0]).all(axis=1).all(axis=1),
-            np.isfinite(tensors[1]).all(axis=1).all(axis=1)
-        ]
-    ).all(axis=0)
-    tensors[0] = tensors[0][patients_both, :, :]
-    tensors[1] = tensors[1][patients_both, :, :]
-    labels = labels.loc[patients_both, :]
-
-    missing_labels = ~labels.isna().any(axis=1)
-    labels = labels.loc[missing_labels, :]
-    tensors[0] = tensors[0][missing_labels, :, :]
-    tensors[1] = tensors[1][missing_labels, :, :]
-
-    np.random.seed(42)
-    tpls = ctPLS(n_components=rank)
-
-    loo = LeaveOneOut()
-    predicted = np.zeros(labels.shape)
-    for train_index, test_index in loo.split(labels):
-        train_data = [
-            tensors[0][train_index, :, :],
-            tensors[1][train_index, :, :]
-        ]
-        test_data = [
-            tensors[0][test_index, :, :],
-            tensors[1][test_index, :, :]
-        ]
-        train_labels = labels.iloc[train_index, :].values
-
-        tpls.fit(train_data, train_labels)
-        predicted[test_index, :] = tpls.predict(test_data)
-
-    q2y = calcR2X(np.exp(labels), np.exp(predicted))
-    return tpls, q2y
-
-
-def run_tpls(data, labels, rank=OPTIMAL_TPLS):
-    """
-    Runs CP_PLSR on provided data and labels.
-
-    Parameters:
-        data:
-        labels:
-        rank:
-
-    Returns:
-    """
-    labels.index = labels.index.astype(str)
-    shared = list(set(data.Patient.values) & set(labels.index.astype(str)))
-    data = data.sel(Patient=list(shared))
-    labels = labels.loc[shared, :]
-
-    if isinstance(data, xr.Dataset):
-        data = data.to_array().squeeze()
-        data = data.to_numpy()
-    elif isinstance(data, xr.DataArray):
-        data = data.to_numpy()
-    elif not isinstance(data, np.ndarray):
-        raise TypeError('Unrecognized data format provided')
-
-    missing = ~np.isnan(data).any(axis=1).any(axis=1)
-    data = data[missing, :, :]
-    labels = labels.loc[missing, :]
-
-    missing_labels = np.isfinite(labels).all(axis=1).values
-    # missing_labels = ~labels.isna().any(axis=1)
-    data = data[missing_labels, :, :]
-    labels = labels.loc[missing_labels, :].values
-
-    np.random.seed(42)
-    # tpls = CP_PLSR(
-    #     n_components=rank,
-    #     random_state=42
-    # )
-    tpls = tPLS(
-        n_components=rank
-    )
-
-    loo = LeaveOneOut()
-    predicted = np.zeros(labels.shape)
-    for train_index, test_index in loo.split(labels):
-        train_data, train_labels = data[train_index, :, :], labels[train_index, :]
-        test_data, test_labels = data[test_index, :, :], labels[test_index, :]
-
-        tpls.fit(train_data, train_labels)
-        predicted[test_index, :] = tpls.predict(test_data)
-
-    # q2y = mean_absolute_error(labels, predicted)
-    q2y = calcR2X(np.exp(labels), np.exp(predicted))
-
-    return tpls, q2y
+    if return_proba:
+        return (tpls, lr_model), acc, probabilities
+    else:
+        return (tpls, lr_model), acc, data
 
 
 def predict_continuous(data, labels):
@@ -370,11 +248,13 @@ def get_probabilities(model, data, labels):
         data = data[labels.index, :]
 
     probabilities = np.zeros(data.shape[0])
+    predicted = probabilities.copy()
     for train_index, test_index in skf.split(data, labels):
         model.fit(data[train_index, :], labels[train_index])
         probabilities[test_index] = model.predict_proba(
             data[test_index, :]
         )[:, 1]
+        predicted[test_index] = model.predict(data[test_index, :])
 
     return probabilities
 
