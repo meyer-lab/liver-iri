@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from ..dataimport import build_coupled_tensor, cytokine_data, import_meta, \
+from ..dataimport import build_coupled_tensors, cytokine_data, import_meta, \
     rna_data, transform_data
 
 TEST_DATA = pd.DataFrame(np.random.random((100, 10)))
@@ -17,7 +17,7 @@ def test_metadata_import():
 
 @pytest.mark.parametrize(
     'import_func',
-    [cytokine_data, rna_data, build_coupled_tensor]
+    [cytokine_data, rna_data, build_coupled_tensors]
 )
 def test_data_imports(import_func):
     """Tests omics data import"""
@@ -67,7 +67,7 @@ def test_transform_shape():
 
 def test_correct_tensor_patients():
     """Tests coupled tensor consists of only patients in metadata"""
-    coupled = build_coupled_tensor(drop_unknown=True)
+    coupled = build_coupled_tensors(drop_unknown=True)
     meta = import_meta()
     shared = set(coupled.Patient.values) & set(meta.index)
 
