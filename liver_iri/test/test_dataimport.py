@@ -41,20 +41,20 @@ def test_correct_transforms(transform):
     assert isinstance(data, pd.DataFrame)
 
 
-def test_incorrect_rna_mean_center_options():
+def test_incorrect_rna_normalize_options():
     """Tests incorrect RNA mean center option"""
     with pytest.raises(ValueError):
-        rna_data(mean_center='foo')
+        rna_data(normalize='foo')
 
 
 @pytest.mark.parametrize(
-    'mean_center',
+    'normalize',
     ['full', 'box', None]
 )
-def test_rna_mean_center_options(mean_center):
+def test_rna_normalize_options(normalize):
     """Tests accepted RNA mean center options"""
     assert isinstance(
-        rna_data(mean_center=mean_center),
+        rna_data(normalize=normalize),
         xr.Dataset
     )
 
@@ -67,7 +67,7 @@ def test_transform_shape():
 
 def test_correct_tensor_patients():
     """Tests coupled tensor consists of only patients in metadata"""
-    coupled = build_coupled_tensors(drop_unknown=True)
+    coupled = build_coupled_tensors()
     meta = import_meta()
     shared = set(coupled.Patient.values) & set(meta.index)
 
