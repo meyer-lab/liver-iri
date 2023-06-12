@@ -421,7 +421,7 @@ viz = ["matplotlib", "seaborn", "nc-time-axis"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "77906d7035f500c9e5a6e93b22d36735fb975c15eb600ba1fad6208f642c9e8a"
+content-hash = "51e110e7fac205c1bb69f457001957a9cc1da7df039d54fdfd609cf5fbd8e397"
 
 [metadata.files]
 cmtf-pls = []

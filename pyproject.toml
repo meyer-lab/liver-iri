@@ -17,7 +17,6 @@ svgutils = "^0.3.4"
 tensorpack = { git = "https://github.com/meyer-lab/tensorpack.git", branch = "main" }
 cmtf-pls = { git = "https://github.com/meyer-lab/cmtf-pls.git", branch = "complete_missing" }
 scikit-learn = "^1.1.1"
-setuptools = "^67.8.0"
 
 
 [tool.poetry.dev-dependencies]
