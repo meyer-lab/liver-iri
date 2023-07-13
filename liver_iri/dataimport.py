@@ -403,7 +403,7 @@ def import_meta(balanced=False):
         pandas.DataFrame: patient meta-data
     """
     if balanced:
-        file_name = 'balanced_meta2.csv'
+        file_name = 'balanced_meta.csv'
     else:
         file_name = 'patient_meta.csv'
 

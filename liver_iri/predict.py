@@ -100,13 +100,20 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         ]
 
     if oversample:
-        undersampler = RandomUnderSampler(sampling_strategy=1/3, random_state=42)
+        undersampler = RandomUnderSampler(
+            sampling_strategy=1/3,
+            random_state=42
+        )
         undersampler.fit_resample(labels.values.reshape(-1, 1), labels)
-        tensors = [tensor[undersampler.sample_indices_, :, :] for tensor in tensors]
+        tensors = [
+            tensor[undersampler.sample_indices_, :, :] for tensor in tensors
+        ]
         labels = labels.iloc[undersampler.sample_indices_]
         oversampler = RandomOverSampler(random_state=42)
         oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
-        tensors = [tensor[oversampler.sample_indices_, :, :] for tensor in tensors]
+        tensors = [
+            tensor[oversampler.sample_indices_, :, :] for tensor in tensors
+        ]
         labels = labels.iloc[oversampler.sample_indices_]
 
     np.random.seed(42)
@@ -211,7 +218,8 @@ def predict_continuous(data, labels):
     return q2y, model
 
 
-def predict_categorical(data, labels, return_coef=False, return_pred=False, oversample=True):
+def predict_categorical(data, labels, return_coef=False, return_pred=False,
+                        oversample=True):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
 
@@ -220,7 +228,8 @@ def predict_categorical(data, labels, return_coef=False, return_pred=False, over
         labels (pandas.Series): Labels for provided data
         return_coef (bool, default: False): Return model coefficients
         return_pred (bool, default: False): Return predictions
-        oversample (bool, default: False): Over/under sample dataset for class balance
+        oversample (bool, default: True): Over/under sample dataset for class
+            balance
 
     Returns:
         score (float): Accuracy for best-performing model
@@ -246,7 +255,10 @@ def predict_categorical(data, labels, return_coef=False, return_pred=False, over
         data = data[labels.index, :]
 
     if oversample:
-        undersampler = RandomUnderSampler(sampling_strategy=0.25, random_state=42)
+        undersampler = RandomUnderSampler(
+            sampling_strategy=0.25,
+            random_state=42
+        )
         data, labels = undersampler.fit_resample(data, labels)
         oversampler = RandomOverSampler(random_state=42)
         data, labels = oversampler.fit_resample(data, labels)
