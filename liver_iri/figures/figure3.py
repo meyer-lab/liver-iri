@@ -1,3 +1,4 @@
+"""Plots Figure 3 -- Component Associations to Clinical Characteristics"""
 import warnings
 
 import pandas as pd
@@ -38,7 +39,7 @@ def get_accuracies(factors, meta):
 
         encoded = encoder.fit_transform(labels)
         data = factors.loc[labels.index, :]
-        score, model = predict_categorical(data, encoded)
+        score, model = predict_categorical(data, encoded, oversample=False)
         accuracies.loc[target] = score
         models[target] = model
 

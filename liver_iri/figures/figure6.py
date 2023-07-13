@@ -1,3 +1,4 @@
+"""Plots Figure 6 -- Clinical Correlations"""
 import warnings
 
 from matplotlib.patches import Patch
