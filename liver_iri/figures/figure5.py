@@ -1,3 +1,4 @@
+"""Plots Figure 5 -- Cytokine Associations"""
 import warnings
 
 import numpy as np

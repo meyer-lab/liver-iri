@@ -1,3 +1,4 @@
+"""Plots Figure 4 -- Flattened Model Accuracies"""
 import warnings
 
 import numpy as np
@@ -107,7 +108,7 @@ def plot_accuracies(accuracies, ax, x_label=None, y_label=None):
 
 
 def makeFigure():
-    meta = import_meta(balanced=True)
+    meta = import_meta()
     graft = meta.loc[:, 'graft_death']
     cyto = cytokine_data(
         column=None,

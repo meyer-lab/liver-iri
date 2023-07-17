@@ -1,4 +1,8 @@
+import warnings
+
 from cmtf_pls.cmtf import ctPLS
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -10,6 +14,11 @@ from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
 from sklearn.svm import SVC
 import xarray as xr
 
+from liver_iri.tensor import run_coupled
+
+warnings.filterwarnings("ignore")
+
+
 OPTIMAL_TPLS = 2
 rskf = RepeatedStratifiedKFold(
     n_repeats=5,
@@ -20,8 +29,24 @@ skf = StratifiedKFold(
 )
 
 
+def cp_impute(data, labels, rank=2):
+    """Imputes missing values via coupled CP decomposition."""
+    _, cp = run_coupled(data, rank)
+    reconstructed = cp.reconstruct()
+    tensors = []
+    for var in data.data_vars:
+        tensor = data[var].sel(Patient=labels.index).to_numpy()
+        imputed = reconstructed[var].sel(Patient=labels.index).to_numpy()
+        mask = np.isnan(tensor)
+        tensor[mask] = imputed[mask]
+        tensors.append(tensor)
+
+    return tensors
+
+
 def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
-                                    drop_missing=True, return_proba=False):
+                                    impute_method=None, return_proba=False,
+                                    return_pred=False, oversample=True):
     """
     Fits coupled tPLS model to provided data and labels.
 
@@ -29,8 +54,8 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         data (xr.Dataset): dataset to evaluate
         labels (pd.Series): labels to regress data against
         rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
-        drop_missing (bool, default:True): drop patients missing ALL
-            measurements in ANY dimension
+        impute_method (str, default:None): specify how to handle missing values;
+            must be one of 'cp', 'drop', 'zero', or None
         return_proba(bool, default:False): returns probability of each patient's
             classification
 
@@ -40,11 +65,14 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         proba (pd.Series, only returns if return_proba): probability of positive
             classification for each patient
     """
+    if impute_method not in ['cp', 'drop', 'zero', None]:
+        raise ValueError('impute_method must be one of "cp", "drop", or "zero"')
+
     shared_patients = sorted(list(set(data.Patient.values) & set(labels.index)))
     data = data.sel(Patient=shared_patients)
     labels = labels.loc[shared_patients]
 
-    if drop_missing:
+    if impute_method == 'drop':
         tensors = [data[var].to_numpy() for var in data.data_vars]
         patients_all = np.array(
             [np.isfinite(tensor).any(axis=1).any(axis=1) for tensor in tensors]
@@ -55,7 +83,7 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
             data[var].sel(Patient=labels.index).to_numpy() for
             var in data.data_vars
         ]
-    else:
+    elif impute_method == 'zero':
         tensors = [
             data[var].sel(Patient=labels.index).to_numpy() for
             var in data.data_vars
@@ -63,6 +91,30 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         for index, tensor in enumerate(tensors):
             all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
             tensors[index][all_missing, :, :] = 0
+    elif impute_method == 'cp':
+        tensors = cp_impute(data, labels)
+    else:
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy() for
+            var in data.data_vars
+        ]
+
+    if oversample:
+        undersampler = RandomUnderSampler(
+            sampling_strategy=1/3,
+            random_state=42
+        )
+        undersampler.fit_resample(labels.values.reshape(-1, 1), labels)
+        tensors = [
+            tensor[undersampler.sample_indices_, :, :] for tensor in tensors
+        ]
+        labels = labels.iloc[undersampler.sample_indices_]
+        oversampler = RandomOverSampler(random_state=42)
+        oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
+        tensors = [
+            tensor[oversampler.sample_indices_, :, :] for tensor in tensors
+        ]
+        labels = labels.iloc[oversampler.sample_indices_]
 
     np.random.seed(42)
     tpls = ctPLS(n_components=rank)
@@ -72,13 +124,21 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         probabilities = predicted.copy()
 
     lr_model = LogisticRegression()
-    for train_index, test_index in skf.split(tensors[0], labels):
-        train_data = [
-            tensor[train_index, :, :] for tensor in tensors
-        ]
-        test_data = [
-            tensor[test_index, :, :] for tensor in tensors
-        ]
+    for train_index, test_index in skf.split(labels, labels):
+        if impute_method == 'cp':
+            train_data = data.sel(Patient=labels.iloc[train_index].index)
+            test_data = data.sel(Patient=labels.iloc[test_index].index)
+
+            train_data = cp_impute(train_data, labels.iloc[train_index])
+            test_data = cp_impute(test_data, labels.iloc[test_index])
+        else:
+            train_data = [
+                tensor[train_index, :, :] for tensor in tensors
+            ]
+            test_data = [
+                tensor[test_index, :, :] for tensor in tensors
+            ]
+
         train_labels = labels.iloc[train_index].values
         tpls.fit(train_data, train_labels)
 
@@ -104,6 +164,8 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
 
     if return_proba:
         return (tpls, lr_model), acc, probabilities
+    elif return_pred:
+        return (tpls, lr_model), predicted, labels
     else:
         return (tpls, lr_model), acc, data
 
@@ -156,7 +218,8 @@ def predict_continuous(data, labels):
     return q2y, model
 
 
-def predict_categorical(data, labels, return_coef=False):
+def predict_categorical(data, labels, return_coef=False, return_pred=False,
+                        oversample=True):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
 
@@ -164,6 +227,9 @@ def predict_categorical(data, labels, return_coef=False):
         data (pandas.DataFrame): Data to predict
         labels (pandas.Series): Labels for provided data
         return_coef (bool, default: False): Return model coefficients
+        return_pred (bool, default: False): Return predictions
+        oversample (bool, default: True): Over/under sample dataset for class
+            balance
 
     Returns:
         score (float): Accuracy for best-performing model
@@ -187,6 +253,15 @@ def predict_categorical(data, labels, return_coef=False):
         data = data.iloc[labels.index, :]
     else:
         data = data[labels.index, :]
+
+    if oversample:
+        undersampler = RandomUnderSampler(
+            sampling_strategy=0.25,
+            random_state=42
+        )
+        data, labels = undersampler.fit_resample(data, labels)
+        oversampler = RandomOverSampler(random_state=42)
+        data, labels = oversampler.fit_resample(data, labels)
 
     model = LogisticRegressionCV(
         l1_ratios=np.linspace(0, 1, 6),
@@ -214,6 +289,8 @@ def predict_categorical(data, labels, return_coef=False):
 
     if return_coef:
         return np.max(scores), model, coef
+    elif return_pred:
+        return np.max(scores), model, model.predict(data), labels
     else:
         return np.max(scores), model
 
@@ -248,13 +325,11 @@ def get_probabilities(model, data, labels):
         data = data[labels.index, :]
 
     probabilities = np.zeros(data.shape[0])
-    predicted = probabilities.copy()
     for train_index, test_index in skf.split(data, labels):
         model.fit(data[train_index, :], labels[train_index])
         probabilities[test_index] = model.predict_proba(
             data[test_index, :]
         )[:, 1]
-        predicted[test_index] = model.predict(data[test_index, :])
 
     return probabilities
 

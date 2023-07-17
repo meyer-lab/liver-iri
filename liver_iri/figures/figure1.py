@@ -1,3 +1,4 @@
+"""Plots Figure 1 -- CP Decomposition"""
 from ..dataimport import cytokine_data
 import pandas as pd
 import xarray as xr
@@ -46,8 +47,11 @@ def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
     comp_labels = [str(ii + 1) for ii in range(rank)]
 
     for rr in range(ddims):
-        sns.heatmap(factors[rr], cmap="PiYG", center=0, xticklabels=comp_labels, yticklabels=factors[rr].index,
-                    cbar=True, vmin=-1.0, vmax=1.0, ax=axes[rr])
+        sns.heatmap(
+            factors[rr], cmap="PiYG", center=0, xticklabels=comp_labels,
+            yticklabels=factors[rr].index, cbar=True, vmin=-1.0,
+            vmax=1.0, ax=axes[rr]
+        )
         axes[rr].set_xlabel("Components")
         axes[rr].set_title(axes_names[rr])
 

@@ -1,3 +1,4 @@
+"""Plots Figure 2 -- Accuracy vs. Rank"""
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -13,7 +14,7 @@ def makeFigure():
     accuracies = pd.Series(index=factor_count, dtype=float)
 
     meta = import_meta()
-    labels = meta.loc[:, 'liri']
+    labels = meta.loc[:, 'graft_death']
     labels = labels.dropna()
 
     encoder = LabelEncoder()
@@ -46,6 +47,6 @@ def makeFigure():
 
     ax.set_xticks(factor_count)
     ax.set_xlabel('Number of Components')
-    ax.set_ylabel('LIRI Prediction Accuracy')
+    ax.set_ylabel('Transplant Outcome Prediction Accuracy')
 
     return fig

@@ -147,7 +147,8 @@ def pv_data(column=None, uniform_lod=False, transform='log', normalize=False,
 
 # noinspection PyArgumentList
 def cytokine_data(column=None, uniform_lod=False, transform='log',
-                  normalize=False, drop_unknown=True, drop_pv=True):
+                  normalize=False, drop_unknown=True, drop_pv=True,
+                  pv_scaling=1):
     """
     Import cytokine data into tensor form.
 
@@ -159,6 +160,7 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
         normalize (bool, default:False): sets zero-mean, variance one
         drop_unknown (bool, default:True): drop patients without metadata
         drop_pv (bool, default:True): drop measurements taken from portal vein
+        pv_scaling (float, default:1): scaling to apply to PV measurements
 
     Returns:
         xarray.Dataset: cytokine data in tensor form
@@ -243,6 +245,9 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
 
     for rrow in df.iterrows():
         data.loc[rrow[1]["PID"], rrow[1]["Visit Type"], :] = rrow[1][6:]
+
+    if not drop_pv:
+        data.loc[{"Cytokine Timepoint": ['PV', 'LF']}] *= pv_scaling
 
     return data.to_dataset(name='Cytokine Measurements')
 
