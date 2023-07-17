@@ -1,4 +1,28 @@
 [[package]]
+name = "cmtf-pls"
+version = "0.1.0"
+description = "A Partial Least Squares (PLS) implementation in CMTF."
+category = "main"
+optional = false
+python-versions = ">=3.9,<3.12"
+develop = false
+
+[package.dependencies]
+numpy = "^1.23.0"
+pandas = "^1.4.3"
+scikit-learn = "^1.1.1"
+seaborn = "^0.11.2"
+tensorly = "^0.8.0"
+tensorpack = {git = "https://github.com/meyer-lab/tensorpack.git", rev = "main"}
+xarray = "^2022.3.0"
+
+[package.source]
+type = "git"
+url = "https://github.com/meyer-lab/cmtf-pls.git"
+reference = "complete_missing"
+resolved_reference = "f7b10c3be43fab70886fe2153b9d598fcc386241"
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -33,17 +57,6 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
-name = "exceptiongroup"
-version = "1.1.2"
-description = "Backport of PEP 654 (exception groups)"
-category = "dev"
-optional = false
-python-versions = ">=3.7"
-
-[package.extras]
-test = ["pytest (>=6)"]
-
-[[package]]
 name = "fonttools"
 version = "4.41.0"
 description = "Tools to manipulate font files"
@@ -67,7 +80,7 @@ woff = ["zopfli (>=0.1.4)", "brotlicffi (>=0.8.0)", "brotli (>=1.0.1)"]
 
 [[package]]
 name = "imbalanced-learn"
-version = "0.10.1"
+version = "0.11.0"
 description = "Toolbox for imbalanced dataset in machine learning."
 category = "main"
 optional = false
@@ -77,29 +90,14 @@ python-versions = "*"
 joblib = ">=1.1.1"
 numpy = ">=1.17.3"
 scikit-learn = ">=1.0.2"
-scipy = ">=1.3.2"
+scipy = ">=1.5.0"
 threadpoolctl = ">=2.0.0"
 
 [package.extras]
-docs = ["pandas (>=1.0.5)", "tensorflow (>=2.4.3)", "keras (>=2.4.3)", "matplotlib (>=3.1.2)", "seaborn (>=0.9.0)", "memory-profiler (>=0.57.0)", "sphinx (>=4.2.0)", "sphinx-gallery (>=0.7.0)", "numpydoc (>=1.0.0)", "sphinxcontrib-bibtex (>=2.4.1)", "pydata-sphinx-theme (>=0.7.2)"]
+docs = ["pandas (>=1.0.5)", "tensorflow (>=2.4.3)", "keras (>=2.4.3)", "matplotlib (>=3.1.2)", "seaborn (>=0.9.0)", "memory-profiler (>=0.57.0)", "sphinx (>=6.0.0)", "sphinx-gallery (>=0.13.0)", "sphinx-copybutton (>=0.5.2)", "numpydoc (>=1.5.0)", "sphinxcontrib-bibtex (>=2.4.1)", "pydata-sphinx-theme (>=0.13.3)"]
 examples = ["pandas (>=1.0.5)", "tensorflow (>=2.4.3)", "keras (>=2.4.3)", "matplotlib (>=3.1.2)", "seaborn (>=0.9.0)"]
 optional = ["pandas (>=1.0.5)", "tensorflow (>=2.4.3)", "keras (>=2.4.3)"]
-tests = ["pandas (>=1.0.5)", "tensorflow (>=2.4.3)", "keras (>=2.4.3)", "pytest (>=5.0.1)", "pytest-cov (>=2.9.0)", "flake8 (>=3.8.2)", "black (>=22.3.0)", "mypy (>=0.770)"]
-
-[[package]]
-name = "importlib-resources"
-version = "6.0.0"
-description = "Read resources from Python packages"
-category = "main"
-optional = false
-python-versions = ">=3.8"
-
-[package.dependencies]
-zipp = {version = ">=3.1.0", markers = "python_version < \"3.10\""}
-
-[package.extras]
-docs = ["sphinx (>=3.5)", "jaraco.packaging (>=9.3)", "rst.linker (>=1.9)", "furo", "sphinx-lint", "jaraco.tidelift (>=1.4)"]
-testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ruff", "pytest-black (>=0.3.7)", "pytest-mypy (>=0.9.1)"]
+tests = ["pandas (>=1.0.5)", "tensorflow (>=2.4.3)", "keras (>=2.4.3)", "pytest (>=5.0.1)", "pytest-cov (>=2.9.0)", "flake8 (>=3.8.2)", "black (>=23.3.0)", "mypy (>=1.3.0)"]
 
 [[package]]
 name = "iniconfig"
@@ -151,7 +149,6 @@ python-versions = ">=3.8"
 contourpy = ">=1.0.1"
 cycler = ">=0.10"
 fonttools = ">=4.22.0"
-importlib-resources = {version = ">=3.2.0", markers = "python_version < \"3.10\""}
 kiwisolver = ">=1.0.1"
 numpy = ">=1.20"
 packaging = ">=20.0"
@@ -186,7 +183,6 @@ python-versions = ">=3.8"
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.20.3", markers = "python_version < \"3.10\""},
     {version = ">=1.21.0", markers = "python_version >= \"3.10\""},
     {version = ">=1.23.2", markers = "python_version >= \"3.11\""},
 ]
@@ -241,11 +237,9 @@ python-versions = ">=3.7"
 
 [package.dependencies]
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
 iniconfig = "*"
 packaging = "*"
 pluggy = ">=0.12,<2.0"
-tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
@@ -329,7 +323,6 @@ python-versions = ">=3.7"
 
 [package.dependencies]
 packaging = ">=20.0"
-tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 typing-extensions = "*"
 
 [package.extras]
@@ -401,14 +394,6 @@ optional = false
 python-versions = ">=3.8"
 
 [[package]]
-name = "tomli"
-version = "2.0.1"
-description = "A lil' TOML parser"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-
-[[package]]
 name = "tqdm"
 version = "4.65.0"
 description = "Fast, Extensible Progress Meter"
@@ -454,31 +439,18 @@ io = ["netcdf4", "h5netcdf", "scipy", "zarr", "fsspec", "cftime", "rasterio", "c
 parallel = ["dask"]
 viz = ["matplotlib", "seaborn", "nc-time-axis"]
 
-[[package]]
-name = "zipp"
-version = "3.16.2"
-description = "Backport of pathlib-compatible object wrapper for zip files"
-category = "main"
-optional = false
-python-versions = ">=3.8"
-
-[package.extras]
-docs = ["sphinx (>=3.5)", "jaraco.packaging (>=9.3)", "rst.linker (>=1.9)", "furo", "sphinx-lint", "jaraco.tidelift (>=1.4)"]
-testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ruff", "jaraco.itertools", "jaraco.functools", "more-itertools", "big-o", "pytest-ignore-flaky", "pytest-black (>=0.3.7)", "pytest-mypy (>=0.9.1)"]
-
 [metadata]
 lock-version = "1.1"
-python-versions = ">=3.9,<3.12"
-content-hash = "de1ea4c3d80fc46bca1c00e5aa179477f7b6883eae460247b033ad5fbd18ca4a"
+python-versions = ">=3.11,<3.12"
+content-hash = "497f16f7f653786f96181e5c5aca1d5b8f0905e25e2c5b906468265c4aff3184"
 
 [metadata.files]
+cmtf-pls = []
 colorama = []
 contourpy = []
 cycler = []
-exceptiongroup = []
 fonttools = []
 imbalanced-learn = []
-importlib-resources = []
 iniconfig = []
 joblib = []
 kiwisolver = []
@@ -502,8 +474,6 @@ svgutils = []
 tensorly = []
 tensorpack = []
 threadpoolctl = []
-tomli = []
 tqdm = []
 typing-extensions = []
 xarray = []
-zipp = []
