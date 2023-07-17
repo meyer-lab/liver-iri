@@ -1,17 +1,111 @@
+from cmtf_pls.cmtf import ctPLS
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import ElasticNet, ElasticNetCV, LogisticRegression, \
     LogisticRegressionCV
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
-    RepeatedStratifiedKFold
+    RepeatedStratifiedKFold, StratifiedKFold
 from sklearn.svm import SVC
+import xarray as xr
 
-skf = RepeatedStratifiedKFold(
-    n_splits=5,
-    n_repeats=5
+OPTIMAL_TPLS = 2
+rskf = RepeatedStratifiedKFold(
+    n_repeats=5,
+    n_splits=10
 )
+skf = StratifiedKFold(
+    n_splits=10
+)
+
+
+def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
+                                    drop_missing=True, return_proba=False):
+    """
+    Fits coupled tPLS model to provided data and labels.
+
+    Parameters:
+        data (xr.Dataset): dataset to evaluate
+        labels (pd.Series): labels to regress data against
+        rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
+        drop_missing (bool, default:True): drop patients missing ALL
+            measurements in ANY dimension
+        return_proba(bool, default:False): returns probability of each patient's
+            classification
+
+    Returns:
+        models (tuple[tPLS, LR classifier]): tuple of trained tPLS and LR model
+        acc (float): accuracy achieved over cross-validation
+        proba (pd.Series, only returns if return_proba): probability of positive
+            classification for each patient
+    """
+    shared_patients = sorted(list(set(data.Patient.values) & set(labels.index)))
+    data = data.sel(Patient=shared_patients)
+    labels = labels.loc[shared_patients]
+
+    if drop_missing:
+        tensors = [data[var].to_numpy() for var in data.data_vars]
+        patients_all = np.array(
+            [np.isfinite(tensor).any(axis=1).any(axis=1) for tensor in tensors]
+        ).all(axis=0)
+        data = data.sel(Patient=data.Patient.values[patients_all])
+        labels = labels.loc[data.Patient.values]
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy() for
+            var in data.data_vars
+        ]
+    else:
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy() for
+            var in data.data_vars
+        ]
+        for index, tensor in enumerate(tensors):
+            all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
+            tensors[index][all_missing, :, :] = 0
+
+    np.random.seed(42)
+    tpls = ctPLS(n_components=rank)
+
+    predicted = pd.Series(0, index=labels.index)
+    if return_proba:
+        probabilities = predicted.copy()
+
+    lr_model = LogisticRegression()
+    for train_index, test_index in skf.split(tensors[0], labels):
+        train_data = [
+            tensor[train_index, :, :] for tensor in tensors
+        ]
+        test_data = [
+            tensor[test_index, :, :] for tensor in tensors
+        ]
+        train_labels = labels.iloc[train_index].values
+        tpls.fit(train_data, train_labels)
+
+        train_transformed = tpls.transform(train_data)
+        test_transformed = tpls.transform(test_data)
+        lr_model.fit(train_transformed, train_labels)
+        predicted.iloc[test_index] = lr_model.predict(test_transformed)
+
+        if return_proba:
+            probabilities.iloc[test_index] = lr_model.predict_proba(
+                test_transformed
+            )[:, 1]
+
+    acc = accuracy_score(
+        labels,
+        predicted
+    )
+    tpls.fit(tensors, labels.values)
+    lr_model.fit(
+        tpls.transform(tensors),
+        labels
+    )
+
+    if return_proba:
+        return (tpls, lr_model), acc, probabilities
+    else:
+        return (tpls, lr_model), acc, data
 
 
 def predict_continuous(data, labels):
@@ -77,6 +171,8 @@ def predict_categorical(data, labels, return_coef=False):
             optimized to predict provided data and labels
         return_coef (numpy.array): LR coefficients for each feature
     """
+    np.random.seed(21517)
+
     if isinstance(labels, pd.Series):
         labels = labels.reset_index(drop=True)
     else:
@@ -98,9 +194,9 @@ def predict_categorical(data, labels, return_coef=False):
         solver="saga",
         penalty="elasticnet",
         n_jobs=-1,
-        cv=skf,
+        cv=rskf,
         max_iter=100000,
-        scoring='balanced_accuracy',
+        scoring='accuracy',
         multi_class='ovr'
     )
     model.fit(data, labels)
@@ -120,6 +216,47 @@ def predict_categorical(data, labels, return_coef=False):
         return np.max(scores), model, coef
     else:
         return np.max(scores), model
+
+
+def get_probabilities(model, data, labels):
+    """
+    Returns probabilities of positive classification via cross-validation.
+
+    Parameters:
+        model (sklearn.BaseEstimator): sklearn model; must have predict_proba()
+        data (pandas.DataFrame): Data to predict
+        labels (pandas.Series): Labels for provided data
+
+    Returns:
+        pd.Series: probability of positive class for each sample
+    """
+    np.random.seed(215)
+
+    if isinstance(labels, pd.Series):
+        labels = labels.reset_index(drop=True)
+    else:
+        labels = pd.Series(labels)
+
+    labels = labels[labels != 'Unknown']
+
+    if isinstance(data, pd.Series):
+        data = data.iloc[labels.index]
+        data = data.values.reshape(-1, 1)
+    elif isinstance(data, pd.DataFrame):
+        data = data.iloc[labels.index, :].values
+    else:
+        data = data[labels.index, :]
+
+    probabilities = np.zeros(data.shape[0])
+    predicted = probabilities.copy()
+    for train_index, test_index in skf.split(data, labels):
+        model.fit(data[train_index, :], labels[train_index])
+        probabilities[test_index] = model.predict_proba(
+            data[test_index, :]
+        )[:, 1]
+        predicted[test_index] = model.predict(data[test_index, :])
+
+    return probabilities
 
 
 def optimize_parameters(classifier, data, labels, params):
@@ -143,7 +280,7 @@ def optimize_parameters(classifier, data, labels, params):
     for index, param in enumerate(params[key]):
         model = classifier(**{key: param})
         scores = []
-        for train_index, test_index in skf.split(data, labels):
+        for train_index, test_index in rskf.split(data, labels):
             model.fit(
                 data.iloc[train_index, :],
                 labels.iloc[train_index]
@@ -199,15 +336,15 @@ def predict_categorical_rf(data, labels, return_coef=False):
         {'n_estimators': np.arange(50, 160, 10)}
     )
     model = RandomForestClassifier(**best_params)
-    scores = np.zeros(shape=(skf.cvargs['n_splits'] * skf.n_repeats))
+    scores = np.zeros(shape=(rskf.cvargs['n_splits'] * rskf.n_repeats))
     coefs = np.zeros(
         shape=(
-            skf.cvargs['n_splits'] * skf.n_repeats,
+            rskf.cvargs['n_splits'] * rskf.n_repeats,
             data.shape[1]
         )
     )
     i = 0
-    for train_index, test_index in skf.split(data, labels):
+    for train_index, test_index in rskf.split(data, labels):
         model.fit(
             data.iloc[train_index, :],
             labels.iloc[train_index]
@@ -267,9 +404,9 @@ def predict_categorical_svc(data, labels):
         {'C': np.logspace(-4, 4, 9)}
     )
     model = SVC(**best_params)
-    scores = np.zeros(shape=(skf.cvargs['n_splits'] * skf.n_repeats))
+    scores = np.zeros(shape=(rskf.cvargs['n_splits'] * rskf.n_repeats))
     i = 0
-    for train_index, test_index in skf.split(data, labels):
+    for train_index, test_index in rskf.split(data, labels):
         model.fit(
             data.iloc[train_index, :],
             labels.iloc[train_index]

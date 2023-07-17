@@ -3,7 +3,7 @@ from tensorpack import perform_CP
 from tensorpack.coupled import CoupledTensor
 import xarray as xr
 
-from liver_iri.dataimport import build_coupled_tensor
+from liver_iri.dataimport import build_coupled_tensors
 
 OPTIMAL_RANK = 4
 
@@ -15,7 +15,7 @@ def run_cp(data, rank=OPTIMAL_RANK):
     Parameters:
         data (xr.Dataset, default: None): coupled tensors to factorize; if
             'None', builds default coupled tensor (see
-            dataimport.build_coupled_tensor)
+            dataimport.build_coupled_tensors)
         rank (int, default: OPTIMAL_RANK): tensor factorization rank
         nonneg (bool, default: False): runs non-negative factorization
 
@@ -54,7 +54,11 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
     rank = int(rank)
 
     if data is None:
-        data = build_coupled_tensor()
+        data = build_coupled_tensors(
+            cytokine_params={},
+            lft_params={},
+            pv_params={}
+        )
 
     if nonneg:
         decomposer = CoupledTensor(
