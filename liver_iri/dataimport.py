@@ -78,7 +78,7 @@ def pv_data(column=None, uniform_lod=False, transform='log', normalize=False,
         "Patient": pd.unique(df["PID"]),
         "PV Timepoint": visit_types,
         "Cytokine": df.columns[6:],
-        },
+    },
         dims=["Patient", "PV Timepoint", "Cytokine"]
     )
 
@@ -124,7 +124,7 @@ def pv_data(column=None, uniform_lod=False, transform='log', normalize=False,
             df.loc[group_cytokines.index, group_cytokines.columns] = \
                 group_cytokines
     else:
-        col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:]>0), axis=0)
+        col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:] > 0), axis=0)
         df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
 
         if transform is not None:
@@ -192,7 +192,7 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
         "Patient": pd.unique(df["PID"]),
         "Cytokine Timepoint": visit_types,
         "Cytokine": df.columns[6:],
-        },
+    },
         dims=["Patient", "Cytokine Timepoint", "Cytokine"]
     )
 
@@ -233,7 +233,7 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
             df.loc[group_cytokines.index, group_cytokines.columns] = \
                 group_cytokines
     else:
-        col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:]>0), axis=0)
+        col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:] > 0), axis=0)
         df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
 
         if transform is not None:
@@ -368,24 +368,36 @@ def build_coupled_tensors(
         lft_params=None,
         pv_params=None
     ):
-    if cytokine_params is not None and not isinstance(cytokine_params, dict):
-        raise ValueError('cytokine_params must be a dict')
+    """
+    Builds datasets and couples across shared patient dimension.
 
-    if rna_params is not None and not isinstance(rna_params, dict):
-        raise ValueError('rna_params must be a dict')
+    Parameters:
+        cytokine_params (dict, None, or False): cytokine constructor parameters
+        rna_params (dict, None, or False): RNA-seq constructor parameters
+        lft_params (dict, None, or False): LFT constructor parameters
+        pv_params (dict, None, or False): PV cytokine constructor parameters
 
-    if lft_params is not None and not isinstance(lft_params, dict):
-        raise ValueError('lft_params must be a dict')
+    Returns:
+        xr.Dataset: coupled datasets merged into one object
 
-    if pv_params is not None and not isinstance(pv_params, dict):
-        raise ValueError('pv_params must be a dict')
-
+    Notes:
+        Parameters for each data constructor should be formatted as a dict
+        mapping arguments to desired values. If None is provided for a
+        constructor's arguments, default parameters are used. If False is
+        provided, the dataset is removed from the merged datasets.
+    """
     tensors = []
-    for params, func in zip(
-        [cytokine_params, rna_params, lft_params, pv_params],
-        [cytokine_data, rna_data, lft_data, pv_data]
+    for params, func, name in zip(
+            [cytokine_params, rna_params, lft_params, pv_params],
+            [cytokine_data, rna_data, lft_data, pv_data],
+            ['cytokine_params', 'rna_params', 'lft_params', 'pv_params']
     ):
-        if params is not None:
+        if not isinstance(params, dict):
+            if params is not None and params is not False:
+                raise TypeError(f'{name} must be dict, None, or False')
+        if params is not False:
+            if params is None:
+                params = {}
             if 'coupled_scaling' in params.keys():
                 scaling = params.pop('coupled_scaling')
             else:
@@ -447,8 +459,8 @@ def import_lfts(score=None, transform='power'):
     if transform is not None:
         lft.loc[:, ~lft.columns.str.contains('inr')] = transform_data(
             lft.loc[
-                :,
-                ~lft.columns.str.contains('inr')
+            :,
+            ~lft.columns.str.contains('inr')
             ],
             transform
         )
