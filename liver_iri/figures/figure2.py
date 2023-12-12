@@ -22,8 +22,7 @@ def makeFigure():
 
     data = build_coupled_tensors(
         cytokine_params={},
-        lft_params={},
-        pv_params={}
+        lft_params={}
     )
     for n_factors in factor_count:
         factors, _ = run_coupled(
