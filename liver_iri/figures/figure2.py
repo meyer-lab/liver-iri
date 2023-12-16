@@ -1,38 +1,32 @@
 """Plots Figure 2 -- Accuracy vs. Rank"""
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 
 from .common import getSetup
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import predict_categorical_svc
-from ..tensor import run_coupled
+from ..predict import run_coupled_tpls_classification
 
 
 def makeFigure():
-    factor_count = np.arange(1, 11)
+    factor_count = np.arange(1, 21)
     accuracies = pd.Series(index=factor_count, dtype=float)
 
     meta = import_meta()
     labels = meta.loc[:, 'graft_death']
     labels = labels.dropna()
 
-    encoder = LabelEncoder()
-    encoded = encoder.fit_transform(labels)
-
     data = build_coupled_tensors(
         cytokine_params={},
+        rna_params=False,
         lft_params={}
     )
     for n_factors in factor_count:
-        factors, _ = run_coupled(
+        (_, _), acc, _ = run_coupled_tpls_classification(
             data,
+            labels,
             rank=n_factors
         )
-
-        factors = factors.loc[labels.index, :]
-        score, _ = predict_categorical_svc(factors, encoded)
-        accuracies.loc[n_factors] = score
+        accuracies.loc[n_factors] = acc
 
     fig_size = (6, 3)
     layout = {'nrows': 1, 'ncols': 1}

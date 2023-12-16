@@ -38,7 +38,7 @@ def transform_data(data, transform='log'):
 
 # noinspection PyArgumentList
 def cytokine_data(column=None, uniform_lod=False, transform='log',
-                  normalize=False, drop_unknown=True, drop_pv=True,
+                  normalize=False, drop_unknown=True, drop_pv=False,
                   pv_scaling=1):
     """
     Import cytokine data into tensor form.
@@ -81,7 +81,7 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
         visit_types = ['PO', 'PV', 'LF', 'D1', 'W1', 'M1']
 
     data = xr.DataArray(coords={
-        "Patient": pd.unique(df["PID"]),
+        "Patient": df["PID"].unique(),
         "Cytokine Timepoint": visit_types,
         "Cytokine": df.columns[3:],
     },
@@ -226,6 +226,8 @@ def lft_data(transform='power', normalize=False, drop_inr=True):
         xarray.Dataset: RNA expression data in tensor form
     """
     lfts = import_lfts(transform=transform)
+    lfts.index = lfts.index.astype(int)
+
     if drop_inr is not None:
         lfts = lfts.loc[:, ~lfts.columns.str.contains('inr')]
         scores = ['ast', 'alt', 'tbil']
@@ -318,7 +320,7 @@ def import_meta(balanced=False):
         ),
         index_col=0,
     )
-    data.index = data.index.astype(str)
+    data.index = data.index.astype(int)
 
     return data
 

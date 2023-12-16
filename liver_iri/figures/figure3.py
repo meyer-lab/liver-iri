@@ -16,13 +16,20 @@ warnings.filterwarnings('ignore')
 CATEGORICAL = ['gender', 'rrc', 'abo', 'liri', 'death']
 REGRESSION = ['age', 'postrepiri']
 TRANSLATIONS = {
-    'gender': 'Gender',
+    'dsx': 'Donor Sex',
+    'dag': 'Donor Age',
+    'dtbili': 'Donor TBIL',
+    'dalt': 'Donor ALT',
+    'abox': 'ABO Compatibility',
+    'cit': 'Cold Ischemia Time',
+    'wit': 'Warm Ischemia Time',
+    'txmeld': 'Transplant MELD Score',
     'rrc': 'Race',
-    'abo': 'Blood Type',
-    'liri': 'LIRI > 1',
-    'death': 'Death',
-    'age': 'Age',
-    'postrepiri': 'LIRI'
+    'iri': 'LIRI > 1',
+    'graft_death': 'Graft Death',
+    'rsx': 'Recipient Sex',
+    'rag': 'Recipient Age',
+    'liri': 'LIRI'
 }
 N_BOOTSTRAP = 30
 
