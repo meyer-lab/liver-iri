@@ -2,7 +2,7 @@
 name = "liver-iri"
 version = "0.1.0"
 description = ""
-authors = ["Cyrillus <cyztan@gmail.com>"]
+authors = ["Jackson L. Chin <JacksonLymanChin@gmail.com>", "Cyrillus <cyztan@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
@@ -25,3 +25,6 @@ pytest = "^7.1.2"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+fbuild = "liver_iri.figures.common:genFigure"
