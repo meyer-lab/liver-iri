@@ -36,118 +36,9 @@ def transform_data(data, transform='log'):
     return data
 
 
-def pv_data(column=None, uniform_lod=False, transform='log', normalize=False,
-            drop_unknown=True):
-    """
-    Import portal vein cytokine data into tensor form.
-
-    Parameters:
-        column (str, default:None): normalizes unique values in provided column
-            independently
-        uniform_lod (bool, default:False): enforces uniform limit of detection
-        transform (str, default:'log'): specifies transformation to use
-        normalize (bool, default:False): sets zero-mean, variance one
-        drop_unknown (bool, default:True): drop patients without metadata
-
-    Returns:
-        xarray.Dataset: cytokine data in tensor form
-    """
-    df = pd.read_csv(
-        join(
-            REPO_PATH,
-            'liver_iri',
-            'data',
-            'cytokine_20201120.csv'
-        )
-    )
-    df = df.drop(['IL-3', 'MIP-1a'], axis=1)
-
-    if drop_unknown:
-        meta = import_meta()
-        patients = set(meta.index)
-        keep_rows = [pid in patients for pid in df.loc[:, 'PID']]
-        df = df.loc[keep_rows, :]
-
-    visit_types = ['PV', 'LF']
-    df = df.loc[df.loc[:, 'Visit Type'] != 'PO', :]
-    df = df.loc[df.loc[:, 'Visit Type'] != 'D1', :]
-    df = df.loc[df.loc[:, 'Visit Type'] != 'W1', :]
-    df = df.loc[df.loc[:, 'Visit Type'] != 'M1', :]
-
-    data = xr.DataArray(coords={
-        "Patient": pd.unique(df["PID"]),
-        "PV Timepoint": visit_types,
-        "Cytokine": df.columns[6:],
-    },
-        dims=["Patient", "PV Timepoint", "Cytokine"]
-    )
-
-    if uniform_lod:
-        col_min = pd.read_csv(
-            join(REPO_PATH, 'liver_iri', 'data', 'cytokine_minimums.csv'),
-            index_col=0
-        ).squeeze()
-        df.iloc[:, 6:] = np.clip(
-            df.iloc[:, 6:],
-            col_min,
-            np.inf,
-            axis=1
-        )
-
-    if column is not None:
-        for group in df.loc[:, column].unique():
-            group_cytokines = df.loc[df.loc[:, column] == group]
-            group_cytokines = group_cytokines.iloc[:, 6:]
-            col_min = np.min(
-                group_cytokines.where(group_cytokines > 0),
-                axis=0
-            )
-            group_cytokines[:] = np.clip(
-                group_cytokines,
-                col_min,
-                np.inf,
-                axis=1
-            )
-
-            if transform is not None:
-                if transform == 'power':
-                    group_cytokines[:] = power_transform(group_cytokines)
-                elif transform == 'log':
-                    group_cytokines[:] = np.log(group_cytokines)
-                elif transform == 'reciprocal':
-                    group_cytokines[:] = np.reciprocal(group_cytokines)
-
-            if normalize:
-                group_cytokines -= np.mean(group_cytokines, axis=0)
-                group_cytokines /= np.std(group_cytokines, axis=0)
-
-            df.loc[group_cytokines.index, group_cytokines.columns] = \
-                group_cytokines
-    else:
-        col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:] > 0), axis=0)
-        df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
-
-        if transform is not None:
-            if transform == 'power':
-                df.iloc[:, 6:] = power_transform(df.iloc[:, 6:])
-            elif transform == 'log':
-                df.iloc[:, 6:] = np.log(df.iloc[:, 6:])
-            elif transform == 'reciprocal':
-                df.iloc[:, 6:] = np.reciprocal(df.iloc[:, 6:])
-
-        if normalize:
-            df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
-            df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
-
-    for rrow in df.iterrows():
-        data.loc[rrow[1]["PID"], rrow[1]["Visit Type"], :] = rrow[1][6:]
-
-    return data.to_dataset(name='PV Measurements')
-
-
 # noinspection PyArgumentList
 def cytokine_data(column=None, uniform_lod=False, transform='log',
-                  normalize=False, drop_unknown=True, drop_pv=True,
+                  normalize=False, drop_unknown=True, drop_pv=False,
                   pv_scaling=1):
     """
     Import cytokine data into tensor form.
@@ -170,28 +61,29 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
             REPO_PATH,
             'liver_iri',
             'data',
-            'cytokine_20201120.csv'
-        )
+            'cytokines.csv'
+        ),
+        index_col=0
     )
     df = df.drop(['IL-3', 'MIP-1a'], axis=1)
 
     if drop_unknown:
         meta = import_meta()
-        patients = set(meta.index)
+        patients = set(meta.index.astype(int))
         keep_rows = [pid in patients for pid in df.loc[:, 'PID']]
         df = df.loc[keep_rows, :]
 
     if drop_pv:
         visit_types = ['PO', 'D1', 'W1', 'M1']
-        df = df.loc[df.loc[:, 'Visit Type'] != 'PV', :]
-        df = df.loc[df.loc[:, 'Visit Type'] != 'LF', :]
+        df = df.loc[df.loc[:, 'visit'] != 'PV', :]
+        df = df.loc[df.loc[:, 'visit'] != 'LF', :]
     else:
         visit_types = ['PO', 'PV', 'LF', 'D1', 'W1', 'M1']
 
     data = xr.DataArray(coords={
-        "Patient": pd.unique(df["PID"]),
+        "Patient": df["PID"].unique(),
         "Cytokine Timepoint": visit_types,
-        "Cytokine": df.columns[6:],
+        "Cytokine": df.columns[3:],
     },
         dims=["Patient", "Cytokine Timepoint", "Cytokine"]
     )
@@ -201,8 +93,8 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
             join(REPO_PATH, 'liver_iri', 'data', 'cytokine_minimums.csv'),
             index_col=0
         ).squeeze()
-        df.iloc[:, 6:] = np.clip(
-            df.iloc[:, 6:],
+        df.iloc[:, 3:] = np.clip(
+            df.iloc[:, 3:],
             col_min,
             np.inf,
             axis=1
@@ -211,7 +103,7 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
     if column is not None:
         for group in df.loc[:, column].unique():
             group_cytokines = df.loc[df.loc[:, column] == group]
-            group_cytokines = group_cytokines.iloc[:, 6:]
+            group_cytokines = group_cytokines.iloc[:, 3:]
             col_min = np.min(
                 group_cytokines.where(group_cytokines > 0),
                 axis=0
@@ -233,18 +125,18 @@ def cytokine_data(column=None, uniform_lod=False, transform='log',
             df.loc[group_cytokines.index, group_cytokines.columns] = \
                 group_cytokines
     else:
-        col_min = np.min(df.iloc[:, 6:].where(df.iloc[:, 6:] > 0), axis=0)
-        df.iloc[:, 6:] = np.clip(df.iloc[:, 6:], col_min, np.inf, axis=1)
+        col_min = np.min(df.iloc[:, 3:].where(df.iloc[:, 3:] > 0), axis=0)
+        df.iloc[:, 3:] = np.clip(df.iloc[:, 3:], col_min, np.inf, axis=1)
 
         if transform is not None:
-            df.iloc[:, 6:] = transform_data(df.iloc[:, 6:], transform)
+            df.iloc[:, 3:] = transform_data(df.iloc[:, 3:], transform)
 
         if normalize:
-            df.iloc[:, 6:] -= np.mean(df.iloc[:, 6:], axis=0)
-            df.iloc[:, 6:] /= np.std(df.iloc[:, 6:], axis=0)
+            df.iloc[:, 3:] -= np.mean(df.iloc[:, 3:], axis=0)
+            df.iloc[:, 3:] /= np.std(df.iloc[:, 3:], axis=0)
 
     for rrow in df.iterrows():
-        data.loc[rrow[1]["PID"], rrow[1]["Visit Type"], :] = rrow[1][6:]
+        data.loc[rrow[1]["PID"], rrow[1]["visit"], :] = rrow[1][3:]
 
     if not drop_pv:
         data.loc[{"Cytokine Timepoint": ['PV', 'LF']}] *= pv_scaling
@@ -334,6 +226,8 @@ def lft_data(transform='power', normalize=False, drop_inr=True):
         xarray.Dataset: RNA expression data in tensor form
     """
     lfts = import_lfts(transform=transform)
+    lfts.index = lfts.index.astype(int)
+
     if drop_inr is not None:
         lfts = lfts.loc[:, ~lfts.columns.str.contains('inr')]
         scores = ['ast', 'alt', 'tbil']
@@ -365,8 +259,7 @@ def lft_data(transform='power', normalize=False, drop_inr=True):
 def build_coupled_tensors(
         cytokine_params=None,
         rna_params=None,
-        lft_params=None,
-        pv_params=None
+        lft_params=None
     ):
     """
     Builds datasets and couples across shared patient dimension.
@@ -375,7 +268,6 @@ def build_coupled_tensors(
         cytokine_params (dict, None, or False): cytokine constructor parameters
         rna_params (dict, None, or False): RNA-seq constructor parameters
         lft_params (dict, None, or False): LFT constructor parameters
-        pv_params (dict, None, or False): PV cytokine constructor parameters
 
     Returns:
         xr.Dataset: coupled datasets merged into one object
@@ -388,9 +280,9 @@ def build_coupled_tensors(
     """
     tensors = []
     for params, func, name in zip(
-            [cytokine_params, rna_params, lft_params, pv_params],
-            [cytokine_data, rna_data, lft_data, pv_data],
-            ['cytokine_params', 'rna_params', 'lft_params', 'pv_params']
+            [cytokine_params, rna_params, lft_params],
+            [cytokine_data, rna_data, lft_data],
+            ['cytokine_params', 'rna_params', 'lft_params']
     ):
         if not isinstance(params, dict):
             if params is not None and params is not False:
@@ -428,7 +320,8 @@ def import_meta(balanced=False):
         ),
         index_col=0,
     )
-    data.index = data.index.astype(str)
+
+    data.index = data.index.astype(int)
 
     return data
 
@@ -459,8 +352,8 @@ def import_lfts(score=None, transform='power'):
     if transform is not None:
         lft.loc[:, ~lft.columns.str.contains('inr')] = transform_data(
             lft.loc[
-            :,
-            ~lft.columns.str.contains('inr')
+                :,
+                ~lft.columns.str.contains('inr')
             ],
             transform
         )
@@ -473,5 +366,7 @@ def import_lfts(score=None, transform='power'):
                 'score must be one of "alt", "ast", "inr", or "tbil"'
             )
         lft = lft.loc[:, lft.columns.str.contains(score)]
+
+    lft.index = lft.index.astype(int)
 
     return lft
