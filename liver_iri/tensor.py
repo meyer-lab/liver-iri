@@ -56,6 +56,7 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
     if data is None:
         data = build_coupled_tensors(
             cytokine_params={},
+            rna_params=False,
             lft_params={}
         )
 

@@ -320,6 +320,7 @@ def import_meta(balanced=False):
         ),
         index_col=0,
     )
+
     data.index = data.index.astype(int)
 
     return data
@@ -365,5 +366,7 @@ def import_lfts(score=None, transform='power'):
                 'score must be one of "alt", "ast", "inr", or "tbil"'
             )
         lft = lft.loc[:, lft.columns.str.contains(score)]
+
+    lft.index = lft.index.astype(int)
 
     return lft

@@ -19,7 +19,7 @@ from liver_iri.tensor import run_coupled
 warnings.filterwarnings("ignore")
 
 
-OPTIMAL_TPLS = 2
+OPTIMAL_TPLS = 10
 rskf = RepeatedStratifiedKFold(
     n_repeats=5,
     n_splits=10
@@ -118,12 +118,32 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
 
     np.random.seed(42)
     tpls = ctPLS(n_components=rank)
+    tpls.fit(tensors, labels.values)
 
     predicted = pd.Series(0, index=labels.index)
     if return_proba:
         probabilities = predicted.copy()
 
-    lr_model = LogisticRegression()
+    model = LogisticRegressionCV(
+        l1_ratios=np.linspace(0, 1, 6),
+        Cs=10,
+        solver="saga",
+        penalty="elasticnet",
+        n_jobs=-1,
+        cv=rskf,
+        max_iter=100000,
+        scoring='accuracy',
+        multi_class='ovr'
+    )
+    model.fit(tpls.Xs_factors[0][0], labels)
+
+    lr_model = LogisticRegression(
+        C=model.C_[0],
+        l1_ratio=model.l1_ratio_[0],
+        solver="saga",
+        penalty="elasticnet",
+        max_iter=100000,
+    )
     for train_index, test_index in skf.split(labels, labels):
         if impute_method == 'cp':
             train_data = data.sel(Patient=labels.iloc[train_index].index)
@@ -152,7 +172,7 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
                 test_transformed
             )[:, 1]
 
-    acc = accuracy_score(
+    acc = balanced_accuracy_score(
         labels,
         predicted
     )
