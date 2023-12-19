@@ -1,11 +1,15 @@
+SHELL := /bin/bash
 
-flist = $(wildcard liver-iri/figures/figure*.py)
+.PHONY: clean test
 
-all: $(patsubst liver-iri/figures/figure%.py, output/figure%.svg, $(flist))
+flist = $(wildcard liver_iri/figures/figure*.py)
+allOutput = $(patsubst liver_iri/figures/figure%.py, output/figure%.svg, $(flist))
 
-output/figure%.svg: liver-iri/figures/figure%.py
-	mkdir -p output
-	XLA_PYTHON_CLIENT_MEM_FRACTION=0.1 poetry run fbuild $*
+all: $(allOutput)
+
+output/figure%.svg: liver_iri/figures/figure%.py
+	@ mkdir -p ./output
+	poetry run fbuild $*
 
 test:
 	XLA_PYTHON_CLIENT_MEM_FRACTION=0.1 poetry run pytest -s -v -x
