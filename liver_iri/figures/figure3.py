@@ -7,23 +7,23 @@ from sklearn.utils import resample
 from sklearn.preprocessing import LabelEncoder, scale
 
 from .common import getSetup
-from ..dataimport import import_meta
-from ..tensor import run_coupled
-from ..predict import predict_categorical, predict_continuous
+from ..dataimport import build_coupled_tensors, import_meta
+from ..predict import predict_categorical, predict_continuous, \
+    run_coupled_tpls_classification
 
 warnings.filterwarnings('ignore')
 
-CATEGORICAL = ['gender', 'rrc', 'abo', 'liri', 'death']
-REGRESSION = ['age', 'postrepiri']
+CATEGORICAL = ['dsx', 'rsx', 'rrc', 'abox', 'iri', 'graft_death']
+REGRESSION = ['dage', 'rag', 'dtbili', 'dalt', 'cit', 'wit', 'txmeld']
 TRANSLATIONS = {
     'dsx': 'Donor Sex',
-    'dag': 'Donor Age',
+    'dage': 'Donor Age',
     'dtbili': 'Donor TBIL',
     'dalt': 'Donor ALT',
-    'abox': 'ABO Compatibility',
-    'cit': 'Cold Ischemia Time',
-    'wit': 'Warm Ischemia Time',
-    'txmeld': 'Transplant MELD Score',
+    'abox': 'ABO\nCompatibility',
+    'cit': 'Cold\nIschemia Time',
+    'wit': 'Warm\nIschemia Time',
+    'txmeld': 'Transplant\nMELD Score',
     'rrc': 'Race',
     'iri': 'LIRI > 1',
     'graft_death': 'Graft Death',
@@ -47,8 +47,10 @@ def get_accuracies(factors, meta):
         encoded = encoder.fit_transform(labels)
         data = factors.loc[labels.index, :]
         score, model = predict_categorical(data, encoded, oversample=False)
-        accuracies.loc[target] = score
         models[target] = model
+
+        if target != 'graft_death':
+            accuracies.loc[target] = score
 
     for target in REGRESSION:
         labels = meta.loc[:, target]
@@ -63,6 +65,7 @@ def get_accuracies(factors, meta):
 
 
 def plot_accuracies(accuracies, ax, y_label=None):
+    accuracies = accuracies.sort_values(ascending=True)
     ax.bar(
         range(len(accuracies)),
         accuracies
@@ -71,7 +74,7 @@ def plot_accuracies(accuracies, ax, y_label=None):
         ax.text(
             index,
             accuracy + 0.01,
-            s=round(accuracy, 4),
+            s=round(accuracy, 3),
             ha='center',
             va='bottom'
         )
@@ -91,7 +94,7 @@ def bootstrap_weights(factors, meta, models):
     feature_weights = pd.DataFrame(
         0,
         index=factors.columns,
-        columns=['gender', 'liri']
+        columns=['graft_death', 'iri']
     )
     feature_devs = feature_weights.copy()
     encoder = LabelEncoder()
@@ -117,22 +120,22 @@ def bootstrap_weights(factors, meta, models):
 
 def plot_errorbars(means, devs, ax):
     ax.errorbar(
-        means.loc[:, 'liri'],
+        means.loc[:, 'iri'],
         np.arange(0, 6 * means.shape[0], 6),
-        xerr=devs.loc[:, 'liri'],
+        xerr=devs.loc[:, 'iri'],
         linestyle='',
         marker='.',
         capsize=4
     )
     ax.errorbar(
-        means.loc[:, 'gender'],
+        means.loc[:, 'graft_death'],
         np.arange(1, 6 * means.shape[0], 6),
-        xerr=devs.loc[:, 'gender'],
+        xerr=devs.loc[:, 'graft_death'],
         linestyle='',
         marker='.',
         capsize=4
     )
-    ax.legend(['LIRI', 'Gender'])
+    ax.legend(['LIRI', 'Graft Death'])
 
     ax.set_yticks(np.arange(0.5, 6 * means.shape[0], 6))
     ax.set_yticklabels(np.arange(1, means.shape[0] + 1))
@@ -144,8 +147,31 @@ def plot_errorbars(means, devs, ax):
 
 
 def makeFigure():
-    factors, _ = run_coupled()
     meta = import_meta()
+    labels = meta.loc[:, 'graft_death']
+    labels = labels.dropna()
+
+    data = build_coupled_tensors(
+        cytokine_params={
+            'coupled_scaling': 1,
+            'pv_scaling': 1
+        },
+        rna_params=False,
+        lft_params={
+            'coupled_scaling': 1
+        }
+    )
+
+    (tpls, _), _, data = run_coupled_tpls_classification(
+        data,
+        labels,
+        oversample=False
+    )
+    factors = pd.DataFrame(
+        tpls.Xs_factors[0][0],
+        index=data.Patient.values,
+        columns=np.arange(tpls.n_components) + 1
+    )
 
     accuracies, q2ys, models = get_accuracies(factors, meta)
     weight_means, weight_devs = bootstrap_weights(factors, meta, models)

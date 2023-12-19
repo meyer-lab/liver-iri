@@ -1,11 +1,11 @@
 """Plots Figure 1 -- CP Decomposition"""
-from ..dataimport import cytokine_data
 import pandas as pd
 import xarray as xr
 import numpy as np
 import seaborn as sns
 
 from .common import getSetup
+from ..dataimport import cytokine_data
 from ..tensor import run_cp
 from ..utils import reorder_table
 

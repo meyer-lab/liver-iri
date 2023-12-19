@@ -16,9 +16,14 @@ def makeFigure():
     labels = labels.dropna()
 
     data = build_coupled_tensors(
-        cytokine_params={},
+        cytokine_params={
+            'coupled_scaling': 1,
+            'pv_scaling': 1
+        },
         rna_params=False,
-        lft_params={}
+        lft_params={
+            'coupled_scaling': 1
+        }
     )
     for n_factors in factor_count:
         (_, _), acc, _ = run_coupled_tpls_classification(
