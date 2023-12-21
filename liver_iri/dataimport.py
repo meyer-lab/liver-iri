@@ -30,7 +30,7 @@ def transform_data(data, transform="log"):
     if transform == "power":
         data[:] = power_transform(data)
     elif transform == "log":
-        data[:] = np.log(data)
+        data[:] = np.log(data + 1)
     elif transform == "reciprocal":
         data[:] = np.reciprocal(data)
 
@@ -39,11 +39,11 @@ def transform_data(data, transform="log"):
 
 # noinspection PyArgumentList
 def cytokine_data(
-    plate_scale: bool = False,
+    plate_scale: bool = True,
     transform: str = "log",
-    normalize: bool = False,
+    normalize: bool = True,
     peripheral_scaling: float = 1,
-    pv_scaling: float = 1,
+    pv_scaling: float = 2,
 ):
     """
     Import cytokine data into tensor form.
@@ -112,7 +112,7 @@ def cytokine_data(
     return data.to_dataset(name="Cytokine Measurements")
 
 
-def lft_data(transform="power", normalize=False, drop_inr=True):
+def lft_data(transform="power", normalize=True, drop_inr=True):
     """
     Import LFT data into tensor form.
 
@@ -155,7 +155,9 @@ def lft_data(transform="power", normalize=False, drop_inr=True):
 
 
 def build_coupled_tensors(
-    peripheral_scaling: float = 1, pv_scaling: float = 1, lft_scaling: float = 1
+    peripheral_scaling: float = 1,
+    pv_scaling: float = 2,
+    lft_scaling: float = 0.5,
 ):
     """
     Builds datasets and couples across shared patient dimension.
