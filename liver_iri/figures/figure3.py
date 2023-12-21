@@ -151,16 +151,7 @@ def makeFigure():
     labels = meta.loc[:, 'graft_death']
     labels = labels.dropna()
 
-    data = build_coupled_tensors(
-        cytokine_params={
-            'coupled_scaling': 1,
-            'pv_scaling': 1
-        },
-        rna_params=False,
-        lft_params={
-            'coupled_scaling': 1
-        }
-    )
+    data = build_coupled_tensors()
 
     (tpls, _), _, data = run_coupled_tpls_classification(
         data,
