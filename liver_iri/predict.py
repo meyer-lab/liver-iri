@@ -116,7 +116,7 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         ]
         labels = labels.iloc[oversampler.sample_indices_]
 
-    np.random.seed(42)
+    np.random.seed(215)
     tpls = ctPLS(n_components=rank)
     tpls.fit(tensors, labels.values)
 
