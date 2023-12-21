@@ -1,7 +1,7 @@
 import numpy as np
+import xarray as xr
 from tensorpack import perform_CP
 from tensorpack.coupled import CoupledTensor
-import xarray as xr
 
 from liver_iri.dataimport import build_coupled_tensors
 
@@ -29,7 +29,7 @@ def run_cp(data, rank=OPTIMAL_RANK):
     elif isinstance(data, xr.DataArray):
         data = data.to_numpy()
     elif not isinstance(data, np.ndarray):
-        raise TypeError('Unrecognized data format provided')
+        raise TypeError("Unrecognized data format provided")
 
     cp = perform_CP(data, rank)
     return cp
@@ -55,25 +55,17 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
 
     if data is None:
         data = build_coupled_tensors(
-            cytokine_params={},
-            rna_params=False,
-            lft_params={}
+            cytokine_params={}, rna_params=False, lft_params={}
         )
 
     if nonneg:
-        decomposer = CoupledTensor(
-            data,
-            rank
-        )
-        decomposer.initialize(method='svd')
+        decomposer = CoupledTensor(data, rank)
+        decomposer.initialize(method="svd")
     else:
-        decomposer = CoupledTensor(
-            data,
-            rank
-        )
-        decomposer.initialize(method='randomized_svd')
+        decomposer = CoupledTensor(data, rank)
+        decomposer.initialize(method="randomized_svd")
 
-    decomposer.fit(nonneg=nonneg, tol=1E-6, maxiter=2500)
+    decomposer.fit(nonneg=nonneg, tol=1e-6, maxiter=2500)
     decomposer.normalize_factors()
     factors = decomposer.x._Patient.to_pandas()
 

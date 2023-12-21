@@ -1,14 +1,14 @@
 """Plots Figure 6 -- Clinical Correlations"""
 import warnings
 
-from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
+from matplotlib.patches import Patch
 from scipy.stats import fisher_exact, spearmanr
 from sklearn.preprocessing import LabelEncoder
 
-from .common import getSetup
 from ..dataimport import import_meta
+from .common import getSetup
 
 warnings.filterwarnings("ignore")
 
@@ -149,14 +149,13 @@ def plot_correlations(p_values, ax, x_label=None, y_label=None):
             Patch(facecolor="b"),
             Patch(facecolor="r"),
             Patch(facecolor="g"),
-            Patch(facecolor="c")
-
+            Patch(facecolor="c"),
         ],
         [
             "Donor Characteristics",
             "Recipient Characteristics",
             "Etiologies",
-            "Clinical Measurements"
+            "Clinical Measurements",
         ],
         loc="upper left",
     )
