@@ -152,7 +152,7 @@ def makeFigure():
     data = build_coupled_tensors()
 
     (tpls, _), _, data = run_coupled_tpls_classification(
-        data, labels, oversample=False
+        data, labels, balanced_resample=False
     )
     factors = pd.DataFrame(
         tpls.Xs_factors[0][0],
