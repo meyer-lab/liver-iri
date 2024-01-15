@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import run_coupled_tpls_classification
+from ..predict import oversample, run_coupled_tpls_classification
 from .common import getSetup
 
 

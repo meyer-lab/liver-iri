@@ -7,8 +7,11 @@ from sklearn.preprocessing import LabelEncoder, scale
 from sklearn.utils import resample
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import (predict_categorical, predict_continuous,
-                       run_coupled_tpls_classification)
+from ..predict import (
+    predict_categorical,
+    predict_continuous,
+    run_coupled_tpls_classification,
+)
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
