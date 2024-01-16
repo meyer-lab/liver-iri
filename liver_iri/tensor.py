@@ -87,9 +87,7 @@ def cp_impute(data: xr.Dataset, labels: pd.Series, rank: int = 2):
 
 
 def convert_to_numpy(
-    data: xr.Dataset,
-    labels: pd.Series,
-    impute_method: str = None
+    data: xr.Dataset, labels: pd.Series, impute_method: str = None
 ):
     """Converts xr.Dataset to tPLS-compatible numpy arrays."""
     if impute_method not in ["cp", "drop", "zero", None]:

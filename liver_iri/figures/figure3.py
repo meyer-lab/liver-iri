@@ -7,11 +7,8 @@ from sklearn.preprocessing import LabelEncoder, scale
 from sklearn.utils import resample
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import (
-    predict_categorical,
-    predict_continuous,
-    run_coupled_tpls_classification
-)
+from ..predict import (predict_categorical, predict_continuous,
+                       run_coupled_tpls_classification)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 
@@ -51,9 +48,7 @@ def get_accuracies(factors, meta):
         encoded = encoder.fit_transform(labels)
         data = factors.loc[labels.index, :]
         score, model = predict_categorical(
-            data,
-            encoded,
-            balanced_resample=False
+            data, encoded, balanced_resample=False
         )
         models[target] = model
 
@@ -157,9 +152,7 @@ def makeFigure():
     data = build_coupled_tensors()
     tensors, labels = convert_to_numpy(data, labels)
 
-    (tpls, _), _, _ = run_coupled_tpls_classification(
-        tensors, labels
-    )
+    (tpls, _), _, _ = run_coupled_tpls_classification(tensors, labels)
     factors = pd.DataFrame(
         tpls.Xs_factors[0][0],
         index=labels.index,

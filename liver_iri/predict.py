@@ -6,20 +6,11 @@ import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
-from sklearn.linear_model import (
-    ElasticNet,
-    ElasticNetCV,
-    LogisticRegression,
-    LogisticRegressionCV,
-)
+from sklearn.linear_model import (ElasticNet, ElasticNetCV, LogisticRegression,
+                                  LogisticRegressionCV)
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from sklearn.model_selection import (
-    LeaveOneOut,
-    RepeatedStratifiedKFold,
-    StratifiedKFold,
-    cross_val_predict,
-)
-
+from sklearn.model_selection import (LeaveOneOut, RepeatedStratifiedKFold,
+                                     StratifiedKFold, cross_val_predict)
 
 warnings.filterwarnings("ignore")
 
@@ -56,7 +47,7 @@ def run_coupled_tpls_classification(
     tensors: list[np.ndarray],
     labels: pd.Series,
     rank: int = OPTIMAL_TPLS,
-    return_proba: bool = False
+    return_proba: bool = False,
 ):
     """
     Fits coupled tPLS model to provided data and labels.

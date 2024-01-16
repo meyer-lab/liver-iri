@@ -3,13 +3,8 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from ..dataimport import (
-    build_coupled_tensors,
-    cytokine_data,
-    import_meta,
-    rna_data,
-    transform_data,
-)
+from ..dataimport import (build_coupled_tensors, cytokine_data, import_meta,
+                          rna_data, transform_data)
 
 TEST_DATA = pd.DataFrame(np.random.random((100, 10)))
 
