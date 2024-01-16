@@ -4,7 +4,7 @@ import pytest
 import xarray as xr
 
 from ..dataimport import (build_coupled_tensors, cytokine_data, import_meta,
-                          rna_data, transform_data)
+                          transform_data)
 
 TEST_DATA = pd.DataFrame(np.random.random((100, 10)))
 
@@ -16,7 +16,7 @@ def test_metadata_import():
 
 
 @pytest.mark.parametrize(
-    "import_func", [cytokine_data, rna_data, build_coupled_tensors]
+    "import_func", [cytokine_data, build_coupled_tensors]
 )
 def test_data_imports(import_func):
     """Tests omics data import"""
@@ -37,18 +37,6 @@ def test_correct_transforms(transform):
     """Tests accepted data transform parameters"""
     data = transform_data(TEST_DATA)
     assert isinstance(data, pd.DataFrame)
-
-
-def test_incorrect_rna_normalize_options():
-    """Tests incorrect RNA mean center option"""
-    with pytest.raises(ValueError):
-        rna_data(normalize="foo")
-
-
-@pytest.mark.parametrize("normalize", ["full", "box", None])
-def test_rna_normalize_options(normalize):
-    """Tests accepted RNA mean center options"""
-    assert isinstance(rna_data(normalize=normalize), xr.Dataset)
 
 
 def test_transform_shape():
