@@ -2,9 +2,10 @@
 import numpy as np
 import pandas as pd
 
-from .common import getSetup
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import run_coupled_tpls_classification
+from ..predict import oversample, run_coupled_tpls_classification
+from ..tensor import convert_to_numpy
+from .common import getSetup
 
 
 def makeFigure():
@@ -12,39 +13,27 @@ def makeFigure():
     accuracies = pd.Series(index=factor_count, dtype=float)
 
     meta = import_meta()
-    labels = meta.loc[:, 'graft_death']
+    labels = meta.loc[:, "graft_death"]
     labels = labels.dropna()
 
-    data = build_coupled_tensors(
-        cytokine_params={
-            'coupled_scaling': 1,
-            'pv_scaling': 1
-        },
-        rna_params=False,
-        lft_params={
-            'coupled_scaling': 1
-        }
-    )
+    data = build_coupled_tensors()
+    tensors, labels = convert_to_numpy(data, labels)
+    oversampled_tensors, oversampled_labels = oversample(tensors, labels)
     for n_factors in factor_count:
         (_, _), acc, _ = run_coupled_tpls_classification(
-            data,
-            labels,
-            rank=n_factors
+            oversampled_tensors, oversampled_labels, rank=n_factors
         )
         accuracies.loc[n_factors] = acc
 
     fig_size = (6, 3)
-    layout = {'nrows': 1, 'ncols': 1}
-    axs, fig = getSetup(
-        fig_size,
-        layout
-    )
+    layout = {"nrows": 1, "ncols": 1}
+    axs, fig = getSetup(fig_size, layout)
     ax = axs[0]
 
     ax.plot(factor_count, accuracies)
 
     ax.set_xticks(factor_count)
-    ax.set_xlabel('Number of Components')
-    ax.set_ylabel('Transplant Outcome Prediction Accuracy')
+    ax.set_xlabel("Number of Components")
+    ax.set_ylabel("Transplant Outcome Prediction Accuracy")
 
     return fig

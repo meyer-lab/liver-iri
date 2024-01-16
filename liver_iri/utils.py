@@ -11,6 +11,6 @@ def reorder_table(df):
         df (pandas.DataFrame): data with rows reordered via heirarchical
             clustering
     """
-    y = sch.linkage(df.to_numpy(), method='centroid')
-    index = sch.dendrogram(y, orientation='right', no_plot=True)['leaves']
+    y = sch.linkage(df.to_numpy(), method="centroid")
+    index = sch.dendrogram(y, orientation="right", no_plot=True)["leaves"]
     return df.iloc[index, :]

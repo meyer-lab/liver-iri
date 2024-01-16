@@ -1,122 +1,73 @@
 import warnings
 
+import numpy as np
+import pandas as pd
+import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import ElasticNet, ElasticNetCV, LogisticRegression, \
-    LogisticRegressionCV
+from sklearn.linear_model import (ElasticNet, ElasticNetCV, LogisticRegression,
+                                  LogisticRegressionCV)
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from sklearn.model_selection import cross_val_predict, LeaveOneOut, \
-    RepeatedStratifiedKFold, StratifiedKFold
-from sklearn.svm import SVC
-import xarray as xr
-
-from liver_iri.tensor import run_coupled
+from sklearn.model_selection import (LeaveOneOut, RepeatedStratifiedKFold,
+                                     StratifiedKFold, cross_val_predict)
 
 warnings.filterwarnings("ignore")
 
 
 OPTIMAL_TPLS = 10
-rskf = RepeatedStratifiedKFold(
-    n_repeats=5,
-    n_splits=10
-)
-skf = StratifiedKFold(
-    n_splits=10
-)
+rskf = RepeatedStratifiedKFold(n_repeats=5, n_splits=10)
+skf = StratifiedKFold(n_splits=10)
 
 
-def cp_impute(data, labels, rank=2):
-    """Imputes missing values via coupled CP decomposition."""
-    _, cp = run_coupled(data, rank)
-    reconstructed = cp.reconstruct()
-    tensors = []
-    for var in data.data_vars:
-        tensor = data[var].sel(Patient=labels.index).to_numpy()
-        imputed = reconstructed[var].sel(Patient=labels.index).to_numpy()
-        mask = np.isnan(tensor)
-        tensor[mask] = imputed[mask]
-        tensors.append(tensor)
+def oversample(tensors: list[np.ndarray], labels: pd.Series):
+    """
+    Over-/under-samples tensor data to form balanced dataset.
 
-    return tensors
+    Parameters:
+        tensors (list of np.ndarray): coupled tensors
+        labels (pd.Series): labels for patients in tensors
+
+    Returns:
+        Over-/under-sampled tensors and labels
+    """
+    undersampler = RandomUnderSampler(sampling_strategy=1 / 3, random_state=42)
+    undersampler.fit_resample(labels.values.reshape(-1, 1), labels)
+    tensors = [tensor[undersampler.sample_indices_, :, :] for tensor in tensors]
+    labels = labels.iloc[undersampler.sample_indices_]
+    oversampler = RandomOverSampler(random_state=42)
+    oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
+    tensors = [tensor[oversampler.sample_indices_, :, :] for tensor in tensors]
+    labels = labels.iloc[oversampler.sample_indices_]
+
+    return tensors, labels
 
 
-def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
-                                    impute_method=None, return_proba=False,
-                                    return_pred=False, oversample=True):
+def run_coupled_tpls_classification(
+    tensors: list[np.ndarray],
+    labels: pd.Series,
+    rank: int = OPTIMAL_TPLS,
+    return_proba: bool = False,
+):
     """
     Fits coupled tPLS model to provided data and labels.
 
     Parameters:
-        data (xr.Dataset): dataset to evaluate
+        tensors (list of np.ndarray): coupled tensors
         labels (pd.Series): labels to regress data against
         rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
-        impute_method (str, default:None): specify how to handle missing values;
-            must be one of 'cp', 'drop', 'zero', or None
-        return_proba(bool, default:False): returns probability of each patient's
-            classification
+        return_proba (bool, default:False): returns probability of each
+            patient's classification
 
     Returns:
         models (tuple[tPLS, LR classifier]): tuple of trained tPLS and LR model
         acc (float): accuracy achieved over cross-validation
+        pred (pd.Series, only returns if not return_proba): predicted value for
+            each patient
         proba (pd.Series, only returns if return_proba): probability of positive
             classification for each patient
     """
-    if impute_method not in ['cp', 'drop', 'zero', None]:
-        raise ValueError('impute_method must be one of "cp", "drop", or "zero"')
-
-    shared_patients = sorted(list(set(data.Patient.values) & set(labels.index)))
-    data = data.sel(Patient=shared_patients)
-    labels = labels.loc[shared_patients]
-
-    if impute_method == 'drop':
-        tensors = [data[var].to_numpy() for var in data.data_vars]
-        patients_all = np.array(
-            [np.isfinite(tensor).any(axis=1).any(axis=1) for tensor in tensors]
-        ).all(axis=0)
-        data = data.sel(Patient=data.Patient.values[patients_all])
-        labels = labels.loc[data.Patient.values]
-        tensors = [
-            data[var].sel(Patient=labels.index).to_numpy() for
-            var in data.data_vars
-        ]
-    elif impute_method == 'zero':
-        tensors = [
-            data[var].sel(Patient=labels.index).to_numpy() for
-            var in data.data_vars
-        ]
-        for index, tensor in enumerate(tensors):
-            all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
-            tensors[index][all_missing, :, :] = 0
-    elif impute_method == 'cp':
-        tensors = cp_impute(data, labels)
-    else:
-        tensors = [
-            data[var].sel(Patient=labels.index).to_numpy() for
-            var in data.data_vars
-        ]
-
-    if oversample:
-        undersampler = RandomUnderSampler(
-            sampling_strategy=1/3,
-            random_state=42
-        )
-        undersampler.fit_resample(labels.values.reshape(-1, 1), labels)
-        tensors = [
-            tensor[undersampler.sample_indices_, :, :] for tensor in tensors
-        ]
-        labels = labels.iloc[undersampler.sample_indices_]
-        oversampler = RandomOverSampler(random_state=42)
-        oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
-        tensors = [
-            tensor[oversampler.sample_indices_, :, :] for tensor in tensors
-        ]
-        labels = labels.iloc[oversampler.sample_indices_]
-
-    np.random.seed(42)
+    np.random.seed(215)
     tpls = ctPLS(n_components=rank)
     tpls.fit(tensors, labels.values)
 
@@ -132,8 +83,8 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         n_jobs=-1,
         cv=rskf,
         max_iter=100000,
-        scoring='accuracy',
-        multi_class='ovr'
+        scoring="accuracy",
+        multi_class="ovr",
     )
     model.fit(tpls.Xs_factors[0][0], labels)
 
@@ -145,20 +96,8 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
         max_iter=100000,
     )
     for train_index, test_index in skf.split(labels, labels):
-        if impute_method == 'cp':
-            train_data = data.sel(Patient=labels.iloc[train_index].index)
-            test_data = data.sel(Patient=labels.iloc[test_index].index)
-
-            train_data = cp_impute(train_data, labels.iloc[train_index])
-            test_data = cp_impute(test_data, labels.iloc[test_index])
-        else:
-            train_data = [
-                tensor[train_index, :, :] for tensor in tensors
-            ]
-            test_data = [
-                tensor[test_index, :, :] for tensor in tensors
-            ]
-
+        train_data = [tensor[train_index, :, :] for tensor in tensors]
+        test_data = [tensor[test_index, :, :] for tensor in tensors]
         train_labels = labels.iloc[train_index].values
         tpls.fit(train_data, train_labels)
 
@@ -172,25 +111,17 @@ def run_coupled_tpls_classification(data, labels, rank=OPTIMAL_TPLS,
                 test_transformed
             )[:, 1]
 
-    acc = balanced_accuracy_score(
-        labels,
-        predicted
-    )
+    acc = accuracy_score(labels, predicted)
     tpls.fit(tensors, labels.values)
-    lr_model.fit(
-        tpls.transform(tensors),
-        labels
-    )
+    lr_model.fit(tpls.transform(tensors), labels)
 
     if return_proba:
         return (tpls, lr_model), acc, probabilities
-    elif return_pred:
-        return (tpls, lr_model), predicted, labels
     else:
-        return (tpls, lr_model), acc, data
+        return (tpls, lr_model), acc, predicted
 
 
-def predict_continuous(data, labels):
+def predict_continuous(data: xr.Dataset, labels: pd.Series):
     """
     Fits Elastic Net model and hyperparameters to provided data.
 
@@ -202,12 +133,8 @@ def predict_continuous(data, labels):
         q2y (float): Accuracy for best-performing model
         model (sklearn.LogisticRegressionCV)
     """
-    if isinstance(labels, pd.Series):
-        labels = labels.reset_index(drop=True)
-    else:
-        labels = pd.Series(labels)
-
-    labels = labels[labels != 'Unknown']
+    labels = labels.reset_index(drop=True)
+    labels = labels[labels != "Unknown"]
 
     if isinstance(data, pd.Series):
         data = data.iloc[labels.index]
@@ -221,25 +148,22 @@ def predict_continuous(data, labels):
     model.fit(data, labels)
 
     loo = LeaveOneOut()
-    model = ElasticNet(
-        alpha=model.alpha_,
-        l1_ratio=model.l1_ratio_
-    )
-    predicted = cross_val_predict(
-        model,
-        data,
-        labels,
-        cv=loo
-    )
-    numerator = sum(predicted ** 2)
-    denominator = sum(labels ** 2)
+    model = ElasticNet(alpha=model.alpha_, l1_ratio=model.l1_ratio_)
+    predicted = cross_val_predict(model, data, labels, cv=loo)
+    numerator = sum(predicted**2)
+    denominator = sum(labels**2)
     q2y = 1 - numerator / denominator
 
     return q2y, model
 
 
-def predict_categorical(data, labels, return_coef=False, return_pred=False,
-                        oversample=True):
+def predict_categorical(
+    data: pd.DataFrame,
+    labels: pd.Series,
+    return_coef: bool = False,
+    return_pred: bool = False,
+    balanced_resample: bool = True,
+):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
 
@@ -248,8 +172,8 @@ def predict_categorical(data, labels, return_coef=False, return_pred=False,
         labels (pandas.Series): Labels for provided data
         return_coef (bool, default: False): Return model coefficients
         return_pred (bool, default: False): Return predictions
-        oversample (bool, default: True): Over/under sample dataset for class
-            balance
+        balanced_resample (bool, default:False): under-/over-samples data to
+            form balanced dataset
 
     Returns:
         score (float): Accuracy for best-performing model
@@ -264,7 +188,7 @@ def predict_categorical(data, labels, return_coef=False, return_pred=False,
     else:
         labels = pd.Series(labels)
 
-    labels = labels[labels != 'Unknown']
+    labels = labels[labels != "Unknown"]
 
     if isinstance(data, pd.Series):
         data = data.iloc[labels.index]
@@ -274,10 +198,9 @@ def predict_categorical(data, labels, return_coef=False, return_pred=False,
     else:
         data = data[labels.index, :]
 
-    if oversample:
+    if balanced_resample:
         undersampler = RandomUnderSampler(
-            sampling_strategy=0.25,
-            random_state=42
+            sampling_strategy=0.25, random_state=42
         )
         data, labels = undersampler.fit_resample(data, labels)
         oversampler = RandomOverSampler(random_state=42)
@@ -291,8 +214,8 @@ def predict_categorical(data, labels, return_coef=False, return_pred=False,
         n_jobs=-1,
         cv=rskf,
         max_iter=100000,
-        scoring='accuracy',
-        multi_class='ovr'
+        scoring="accuracy",
+        multi_class="ovr",
     )
     model.fit(data, labels)
     coef = model.coef_[0]
@@ -334,7 +257,7 @@ def get_probabilities(model, data, labels):
     else:
         labels = pd.Series(labels)
 
-    labels = labels[labels != 'Unknown']
+    labels = labels[labels != "Unknown"]
 
     if isinstance(data, pd.Series):
         data = data.iloc[labels.index]
@@ -347,173 +270,8 @@ def get_probabilities(model, data, labels):
     probabilities = np.zeros(data.shape[0])
     for train_index, test_index in skf.split(data, labels):
         model.fit(data[train_index, :], labels[train_index])
-        probabilities[test_index] = model.predict_proba(
-            data[test_index, :]
-        )[:, 1]
+        probabilities[test_index] = model.predict_proba(data[test_index, :])[
+            :, 1
+        ]
 
     return probabilities
-
-
-def optimize_parameters(classifier, data, labels, params):
-    """
-    Optimizes parameters for provided classifier.
-
-    Parameters:
-        classifier (sklearn.estimator): sklearn classifier
-        data (pandas.DataFrame): Data to predict
-        labels (pandas.Series): Labels for provided data
-        params (dict[str:Iterable]): Maps parameter name to values to test
-
-    Returns:
-        params (dict[str:Iterable]): Parameters that lead to highest accuracy
-            via cross-validation
-    """
-    key = list(params.keys())[0]
-    grid = np.zeros(
-        shape=[len(params[key])]
-    )
-    for index, param in enumerate(params[key]):
-        model = classifier(**{key: param})
-        scores = []
-        for train_index, test_index in rskf.split(data, labels):
-            model.fit(
-                data.iloc[train_index, :],
-                labels.iloc[train_index]
-            )
-            predicted = model.predict(data.iloc[test_index, :])
-            scores.append(
-                balanced_accuracy_score(
-                    labels.iloc[test_index],
-                    predicted
-                )
-            )
-        grid[index] = np.mean(scores)
-
-    return {
-        key: params[key][int(np.argmax(grid))],
-    }
-
-
-def predict_categorical_rf(data, labels, return_coef=False):
-    """
-    Fits Random Forest classifier model and hyperparameters to provided data.
-
-    Parameters:
-        data (pandas.DataFrame): Data to predict
-        labels (pandas.Series): Labels for provided data
-        return_coef (bool, default: False): Return model coefficients
-
-    Returns:
-        score (float): Accuracy for best-performing model
-        model (sklearn.LogisticRegression): Fitted model with hyperparameters
-            optimized to predict provided data and labels
-        return_coef (numpy.array): LR coefficients for each feature
-    """
-    if isinstance(labels, pd.Series):
-        labels = labels.reset_index(drop=True)
-    else:
-        labels = pd.Series(labels)
-
-    labels = labels[labels != 'Unknown']
-
-    if isinstance(data, pd.Series):
-        data = data.iloc[labels.index]
-        data = data.values.reshape(-1, 1)
-    elif isinstance(data, pd.DataFrame):
-        data = data.iloc[labels.index, :]
-    else:
-        data = data[labels.index, :]
-
-    best_params = optimize_parameters(
-        RandomForestClassifier,
-        data,
-        labels,
-        {'n_estimators': np.arange(50, 160, 10)}
-    )
-    model = RandomForestClassifier(**best_params)
-    scores = np.zeros(shape=(rskf.cvargs['n_splits'] * rskf.n_repeats))
-    coefs = np.zeros(
-        shape=(
-            rskf.cvargs['n_splits'] * rskf.n_repeats,
-            data.shape[1]
-        )
-    )
-    i = 0
-    for train_index, test_index in rskf.split(data, labels):
-        model.fit(
-            data.iloc[train_index, :],
-            labels.iloc[train_index]
-        )
-        predicted = model.predict(data.iloc[test_index, :])
-        scores[i] = \
-            balanced_accuracy_score(
-                labels.iloc[test_index],
-                predicted
-            )
-
-        coefs[i, :] = model.feature_importances_
-        i += 1
-
-    score = np.mean(scores)
-    coefs = np.mean(coefs, axis=0)
-
-    if return_coef:
-        return score, model, coefs
-    else:
-        return score, model
-
-
-def predict_categorical_svc(data, labels):
-    """
-    Fits SVC model and hyperparameters to provided data.
-
-    Parameters:
-        data (pandas.DataFrame): Data to predict
-        labels (pandas.Series): Labels for provided data
-
-    Returns:
-        score (float): Accuracy for best-performing model
-        model (sklearn.LogisticRegression): Fitted model with hyperparameters
-            optimized to predict provided data and labels
-        return_coef (numpy.array): LR coefficients for each feature
-    """
-    if isinstance(labels, pd.Series):
-        labels = labels.reset_index(drop=True)
-    else:
-        labels = pd.Series(labels)
-
-    labels = labels[labels != 'Unknown']
-
-    if isinstance(data, pd.Series):
-        data = data.iloc[labels.index]
-        data = data.values.reshape(-1, 1)
-    elif isinstance(data, pd.DataFrame):
-        data = data.iloc[labels.index, :]
-    else:
-        data = data[labels.index, :]
-
-    best_params = optimize_parameters(
-        SVC,
-        data,
-        labels,
-        {'C': np.logspace(-4, 4, 9)}
-    )
-    model = SVC(**best_params)
-    scores = np.zeros(shape=(rskf.cvargs['n_splits'] * rskf.n_repeats))
-    i = 0
-    for train_index, test_index in rskf.split(data, labels):
-        model.fit(
-            data.iloc[train_index, :],
-            labels.iloc[train_index]
-        )
-        predicted = model.predict(data.iloc[test_index, :])
-        scores[i] = \
-            balanced_accuracy_score(
-                labels.iloc[test_index],
-                predicted
-            )
-
-        i += 1
-
-    score = np.mean(scores)
-    return score, model

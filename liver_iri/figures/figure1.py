@@ -1,13 +1,13 @@
 """Plots Figure 1 -- CP Decomposition"""
-import pandas as pd
-import xarray as xr
 import numpy as np
+import pandas as pd
 import seaborn as sns
+import xarray as xr
 
-from .common import getSetup
 from ..dataimport import cytokine_data
 from ..tensor import run_cp
 from ..utils import reorder_table
+from .common import getSetup
 
 
 def makeFigure():
@@ -15,7 +15,7 @@ def makeFigure():
     return makeComponentPlot(data, 8, ["Patient", "Cytokine"])
 
 
-def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
+def makeComponentPlot(data: xr.DataArray, rank: int, reorder=[]):
     cp = run_cp(data, rank)
 
     ddims = len(data.coords)
@@ -25,8 +25,9 @@ def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
         pd.DataFrame(
             cp[1][rr],
             columns=[f"Cmp. {i}" for i in np.arange(1, rank + 1)],
-            index=data.coords[axes_names[rr]]
-        ) for rr in range(ddims)
+            index=data.coords[axes_names[rr]],
+        )
+        for rr in range(ddims)
     ]
 
     for r_ax in reorder:
@@ -39,18 +40,21 @@ def makeComponentPlot(data:xr.DataArray, rank: int, reorder=[]):
             factors[rr] = reorder_table(factors[rr])
 
     fig_size = (5 * ddims, 6)
-    layout = {'nrows': 1, 'ncols': ddims, 'wspace': 0.1}
-    axes, fig = getSetup(
-        fig_size,
-        layout
-    )
+    layout = {"nrows": 1, "ncols": ddims, "wspace": 0.1}
+    axes, fig = getSetup(fig_size, layout)
     comp_labels = [str(ii + 1) for ii in range(rank)]
 
     for rr in range(ddims):
         sns.heatmap(
-            factors[rr], cmap="PiYG", center=0, xticklabels=comp_labels,
-            yticklabels=factors[rr].index, cbar=True, vmin=-1.0,
-            vmax=1.0, ax=axes[rr]
+            factors[rr],
+            cmap="PiYG",
+            center=0,
+            xticklabels=comp_labels,
+            yticklabels=factors[rr].index,
+            cbar=True,
+            vmin=-1.0,
+            vmax=1.0,
+            ax=axes[rr],
         )
         axes[rr].set_xlabel("Components")
         axes[rr].set_title(axes_names[rr])
