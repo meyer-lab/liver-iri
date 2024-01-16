@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import xarray as xr
 from tensorpack import perform_CP
 from tensorpack.coupled import CoupledTensor
@@ -54,9 +55,7 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
     rank = int(rank)
 
     if data is None:
-        data = build_coupled_tensors(
-            cytokine_params={}, rna_params=False, lft_params={}
-        )
+        data = build_coupled_tensors()
 
     if nonneg:
         decomposer = CoupledTensor(data, rank)
@@ -70,3 +69,61 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
     factors = decomposer.x._Patient.to_pandas()
 
     return factors, decomposer
+
+
+def cp_impute(data: xr.Dataset, labels: pd.Series, rank: int = 2):
+    """Imputes missing values via coupled CP decomposition."""
+    _, cp = run_coupled(data, rank)
+    reconstructed = cp.reconstruct()
+    tensors = []
+    for var in data.data_vars:
+        tensor = data[var].sel(Patient=labels.index).to_numpy()
+        imputed = reconstructed[var].sel(Patient=labels.index).to_numpy()
+        mask = np.isnan(tensor)
+        tensor[mask] = imputed[mask]
+        tensors.append(tensor)
+
+    return tensors
+
+
+def convert_to_numpy(
+    data: xr.Dataset,
+    labels: pd.Series,
+    impute_method: str = None
+):
+    """Converts xr.Dataset to tPLS-compatible numpy arrays."""
+    if impute_method not in ["cp", "drop", "zero", None]:
+        raise ValueError('impute_method must be one of "cp", "drop", or "zero"')
+
+    shared_patients = sorted(list(set(data.Patient.values) & set(labels.index)))
+    data = data.sel(Patient=shared_patients)
+    labels = labels.loc[shared_patients]
+
+    if impute_method == "drop":
+        tensors = [data[var].to_numpy() for var in data.data_vars]
+        patients_all = np.array(
+            [np.isfinite(tensor).any(axis=1).any(axis=1) for tensor in tensors]
+        ).all(axis=0)
+        data = data.sel(Patient=data.Patient.values[patients_all])
+        labels = labels.loc[data.Patient.values]
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy()
+            for var in data.data_vars
+        ]
+    elif impute_method == "zero":
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy()
+            for var in data.data_vars
+        ]
+        for index, tensor in enumerate(tensors):
+            all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
+            tensors[index][all_missing, :, :] = 0
+    elif impute_method == "cp":
+        tensors = cp_impute(data, labels)
+    else:
+        tensors = [
+            data[var].sel(Patient=labels.index).to_numpy()
+            for var in data.data_vars
+        ]
+
+    return tensors, labels

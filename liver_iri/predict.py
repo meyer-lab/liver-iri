@@ -6,7 +6,6 @@ import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import (
     ElasticNet,
     ElasticNetCV,
@@ -21,7 +20,6 @@ from sklearn.model_selection import (
     cross_val_predict,
 )
 
-from liver_iri.tensor import run_coupled
 
 warnings.filterwarnings("ignore")
 
@@ -29,21 +27,6 @@ warnings.filterwarnings("ignore")
 OPTIMAL_TPLS = 10
 rskf = RepeatedStratifiedKFold(n_repeats=5, n_splits=10)
 skf = StratifiedKFold(n_splits=10)
-
-
-def cp_impute(data: xr.Dataset, labels: pd.Series, rank: int = 2):
-    """Imputes missing values via coupled CP decomposition."""
-    _, cp = run_coupled(data, rank)
-    reconstructed = cp.reconstruct()
-    tensors = []
-    for var in data.data_vars:
-        tensor = data[var].sel(Patient=labels.index).to_numpy()
-        imputed = reconstructed[var].sel(Patient=labels.index).to_numpy()
-        mask = np.isnan(tensor)
-        tensor[mask] = imputed[mask]
-        tensors.append(tensor)
-
-    return tensors
 
 
 def oversample(tensors: list[np.ndarray], labels: pd.Series):
@@ -70,26 +53,20 @@ def oversample(tensors: list[np.ndarray], labels: pd.Series):
 
 
 def run_coupled_tpls_classification(
-    data: xr.Dataset,
+    tensors: list[np.ndarray],
     labels: pd.Series,
     rank: int = OPTIMAL_TPLS,
-    impute_method: str = None,
-    return_proba: bool = False,
-    balanced_resample: bool = False,
+    return_proba: bool = False
 ):
     """
     Fits coupled tPLS model to provided data and labels.
 
     Parameters:
-        data (xr.Dataset): dataset to evaluate
+        tensors (list of np.ndarray): coupled tensors
         labels (pd.Series): labels to regress data against
         rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
-        impute_method (str, default:None): specify how to handle missing values;
-            must be one of 'cp', 'drop', 'zero', or None
         return_proba (bool, default:False): returns probability of each
             patient's classification
-        balanced_resample (bool, default:False): under-/over-samples data to
-            form balanced dataset
 
     Returns:
         models (tuple[tPLS, LR classifier]): tuple of trained tPLS and LR model
@@ -99,43 +76,6 @@ def run_coupled_tpls_classification(
         proba (pd.Series, only returns if return_proba): probability of positive
             classification for each patient
     """
-    if impute_method not in ["cp", "drop", "zero", None]:
-        raise ValueError('impute_method must be one of "cp", "drop", or "zero"')
-
-    shared_patients = sorted(list(set(data.Patient.values) & set(labels.index)))
-    data = data.sel(Patient=shared_patients)
-    labels = labels.loc[shared_patients]
-
-    if impute_method == "drop":
-        tensors = [data[var].to_numpy() for var in data.data_vars]
-        patients_all = np.array(
-            [np.isfinite(tensor).any(axis=1).any(axis=1) for tensor in tensors]
-        ).all(axis=0)
-        data = data.sel(Patient=data.Patient.values[patients_all])
-        labels = labels.loc[data.Patient.values]
-        tensors = [
-            data[var].sel(Patient=labels.index).to_numpy()
-            for var in data.data_vars
-        ]
-    elif impute_method == "zero":
-        tensors = [
-            data[var].sel(Patient=labels.index).to_numpy()
-            for var in data.data_vars
-        ]
-        for index, tensor in enumerate(tensors):
-            all_missing = np.isnan(tensor).all(axis=1).all(axis=1)
-            tensors[index][all_missing, :, :] = 0
-    elif impute_method == "cp":
-        tensors = cp_impute(data, labels)
-    else:
-        tensors = [
-            data[var].sel(Patient=labels.index).to_numpy()
-            for var in data.data_vars
-        ]
-
-    if balanced_resample:
-        tensors, labels = oversample(tensors, labels)
-
     np.random.seed(215)
     tpls = ctPLS(n_components=rank)
     tpls.fit(tensors, labels.values)
@@ -165,16 +105,8 @@ def run_coupled_tpls_classification(
         max_iter=100000,
     )
     for train_index, test_index in skf.split(labels, labels):
-        if impute_method == "cp":
-            train_data = data.sel(Patient=labels.iloc[train_index].index)
-            test_data = data.sel(Patient=labels.iloc[test_index].index)
-
-            train_data = cp_impute(train_data, labels.iloc[train_index])
-            test_data = cp_impute(test_data, labels.iloc[test_index])
-        else:
-            train_data = [tensor[train_index, :, :] for tensor in tensors]
-            test_data = [tensor[test_index, :, :] for tensor in tensors]
-
+        train_data = [tensor[train_index, :, :] for tensor in tensors]
+        test_data = [tensor[test_index, :, :] for tensor in tensors]
         train_labels = labels.iloc[train_index].values
         tpls.fit(train_data, train_labels)
 
