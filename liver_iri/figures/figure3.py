@@ -10,8 +10,9 @@ from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import (
     predict_categorical,
     predict_continuous,
-    run_coupled_tpls_classification,
+    run_coupled_tpls_classification
 )
+from ..tensor import convert_to_numpy
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
@@ -49,7 +50,11 @@ def get_accuracies(factors, meta):
 
         encoded = encoder.fit_transform(labels)
         data = factors.loc[labels.index, :]
-        score, model = predict_categorical(data, encoded, oversample=False)
+        score, model = predict_categorical(
+            data,
+            encoded,
+            balanced_resample=False
+        )
         models[target] = model
 
         if target != "graft_death":
@@ -150,13 +155,14 @@ def makeFigure():
     labels = labels.dropna()
 
     data = build_coupled_tensors()
+    tensors, labels = convert_to_numpy(data, labels)
 
-    (tpls, _), _, data = run_coupled_tpls_classification(
-        data, labels, balanced_resample=False
+    (tpls, _), _, _ = run_coupled_tpls_classification(
+        tensors, labels
     )
     factors = pd.DataFrame(
         tpls.Xs_factors[0][0],
-        index=data.Patient.values,
+        index=labels.index,
         columns=np.arange(tpls.n_components) + 1,
     )
 

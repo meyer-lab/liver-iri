@@ -4,6 +4,7 @@ import pandas as pd
 
 from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import oversample, run_coupled_tpls_classification
+from ..tensor import convert_to_numpy
 from .common import getSetup
 
 
@@ -16,9 +17,11 @@ def makeFigure():
     labels = labels.dropna()
 
     data = build_coupled_tensors()
+    tensors, labels = convert_to_numpy(data, labels)
+    oversampled_tensors, oversampled_labels = oversample(tensors, labels)
     for n_factors in factor_count:
         (_, _), acc, _ = run_coupled_tpls_classification(
-            data, labels, rank=n_factors
+            oversampled_tensors, oversampled_labels, rank=n_factors
         )
         accuracies.loc[n_factors] = acc
 

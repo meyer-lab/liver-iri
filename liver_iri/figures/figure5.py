@@ -60,11 +60,7 @@ def makeFigure():
     meta = import_meta()
     graft = meta.loc[:, "graft_death"]
     cyto = cytokine_data(
-        column=None,
-        uniform_lod=False,
-        transform="log",
         normalize=False,
-        drop_pv=False,
     )
 
     matrices = []
