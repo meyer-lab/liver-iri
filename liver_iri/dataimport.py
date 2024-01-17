@@ -156,8 +156,8 @@ def lft_data(transform="power", normalize=True, drop_inr=True):
 
 def build_coupled_tensors(
     peripheral_scaling: float = 1,
-    pv_scaling: float = 2,
-    lft_scaling: float = 0.5,
+    pv_scaling: float = 1,
+    lft_scaling: float = 1,
 ):
     """
     Builds datasets and couples across shared patient dimension.

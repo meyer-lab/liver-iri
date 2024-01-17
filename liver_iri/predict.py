@@ -15,7 +15,7 @@ from sklearn.model_selection import (LeaveOneOut, RepeatedStratifiedKFold,
 warnings.filterwarnings("ignore")
 
 
-OPTIMAL_TPLS = 10
+OPTIMAL_TPLS = 9
 rskf = RepeatedStratifiedKFold(n_repeats=5, n_splits=10)
 skf = StratifiedKFold(n_splits=10)
 
