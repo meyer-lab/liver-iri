@@ -3,10 +3,13 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_curve
+from sklearn.metrics import precision_recall_fscore_support, roc_curve
 
-from ..dataimport import cytokine_data, import_lfts, import_meta
-from ..predict import get_probabilities, predict_categorical
+from ..dataimport import (build_coupled_tensors, cytokine_data, import_lfts,
+                          import_meta)
+from ..predict import (get_probabilities, oversample, predict_categorical,
+                       run_coupled_tpls_classification)
+from ..tensor import convert_to_numpy
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
@@ -121,24 +124,70 @@ def makeFigure():
     cyto_accuracies, cyto_curves = get_accuracies(matrices, graft, cyto_names)
     lft_accuracies, lft_curves = get_accuracies(lft_matrices, graft, lft_names)
 
-    fig_size = (8, 6)
-    layout = {"nrows": 2, "ncols": 2}
+    fig_size = (6, 6)
+    layout = {"nrows": 3, "ncols": 2}
     axs, fig = getSetup(fig_size, layout)
+
+    data = build_coupled_tensors()
+    tensors, labels = convert_to_numpy(data, graft)
+    oversampled_tensors, oversampled_labels = oversample(tensors, labels)
+    (_, _), _, proba = run_coupled_tpls_classification(
+        oversampled_tensors, oversampled_labels, return_proba=True
+    )
+    predicted = proba.round().astype(int)
+
+    ax = axs[0]
+    precision, recall, fbeta, _ = precision_recall_fscore_support(
+        oversampled_labels,
+        predicted
+    )
+    ax.bar(
+        np.arange(0, 8, 3),
+        [precision[0], recall[0], fbeta[0]],
+        width=1
+    )
+    ax.bar(
+        np.arange(1, 8, 3),
+        [precision[1], recall[1], fbeta[1]],
+        width=1
+    )
+    ax.set_xticks(np.arange(0.5, 8, 3))
+    ax.set_yticks(np.arange(0, 1.2, 0.2))
+    ax.set_xticklabels(
+        ["Precision", "Recall", "F1"],
+        ha="center",
+        ma="center",
+        va="top"
+    )
+    ax.legend(["Non-Graft Rejection", "Graft Rejection"])
+    ax.set_ylim([0, 1.2])
+
+    ax = axs[1]
+    fpr, tpr, _ = roc_curve(oversampled_labels, proba)
+    ax.plot([0, 1], [0, 1], color="k", linestyle="--")
+    ax.plot(
+        fpr,
+        tpr
+    )
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
 
     plot_accuracies(
         cyto_accuracies,
-        axs[0],
+        axs[2],
         x_label="Cytokine Measurements",
         y_label="Classification Accuracy",
     )
-    plot_curves(cyto_curves, axs[1], cyto_names)
+    plot_curves(cyto_curves, axs[3], cyto_names)
 
     plot_accuracies(
         lft_accuracies,
-        axs[2],
+        axs[4],
         x_label="LFT Measurements",
         y_label="Classification Accuracy",
     )
-    plot_curves(lft_curves, axs[3], lft_names)
+    plot_curves(lft_curves, axs[5], lft_names)
 
     return fig
