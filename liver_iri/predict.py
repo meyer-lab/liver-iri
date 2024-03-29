@@ -2,22 +2,30 @@ import warnings
 
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator
 import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
-from imblearn.under_sampling import RandomUnderSampler
-from sklearn.linear_model import (ElasticNet, ElasticNetCV, LogisticRegression,
-                                  LogisticRegressionCV)
-from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from sklearn.model_selection import (LeaveOneOut, RepeatedStratifiedKFold,
-                                     StratifiedKFold, cross_val_predict)
+from sklearn.linear_model import (
+    ElasticNet,
+    ElasticNetCV,
+    LogisticRegression,
+    LogisticRegressionCV,
+)
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import (
+    KFold,
+    LeaveOneOut,
+    StratifiedKFold,
+    cross_val_predict,
+)
 
 warnings.filterwarnings("ignore")
 
 
-OPTIMAL_TPLS = 9
-rskf = RepeatedStratifiedKFold(n_repeats=5, n_splits=10)
-skf = StratifiedKFold(n_splits=10)
+OPTIMAL_TPLS = 2
+kf = KFold(n_splits=10)
+skf = StratifiedKFold(n_splits=20)
 
 
 def oversample(tensors: list[np.ndarray], labels: pd.Series):
@@ -31,10 +39,6 @@ def oversample(tensors: list[np.ndarray], labels: pd.Series):
     Returns:
         Over-/under-sampled tensors and labels
     """
-    undersampler = RandomUnderSampler(sampling_strategy=1 / 3, random_state=42)
-    undersampler.fit_resample(labels.values.reshape(-1, 1), labels)
-    tensors = [tensor[undersampler.sample_indices_, :, :] for tensor in tensors]
-    labels = labels.iloc[undersampler.sample_indices_]
     oversampler = RandomOverSampler(random_state=42)
     oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
     tensors = [tensor[oversampler.sample_indices_, :, :] for tensor in tensors]
@@ -76,19 +80,18 @@ def run_coupled_tpls_classification(
         probabilities = predicted.copy()
 
     model = LogisticRegressionCV(
-        l1_ratios=np.linspace(0, 1, 6),
-        Cs=10,
+        l1_ratios=np.linspace(0, 1, 11),
+        Cs=11,
         solver="saga",
         penalty="elasticnet",
         n_jobs=-1,
-        cv=rskf,
+        cv=skf,
         max_iter=100000,
-        scoring="accuracy",
+        scoring="balanced_accuracy",
         multi_class="ovr",
     )
-    model.fit(tpls.Xs_factors[0][0], labels)
-
-    lr_model = LogisticRegression(
+    model.fit(tpls.Xs_factors[0][0], labels.values)
+    model = LogisticRegression(
         C=model.C_[0],
         l1_ratio=model.l1_ratio_[0],
         solver="saga",
@@ -98,27 +101,29 @@ def run_coupled_tpls_classification(
     for train_index, test_index in skf.split(labels, labels):
         train_data = [tensor[train_index, :, :] for tensor in tensors]
         test_data = [tensor[test_index, :, :] for tensor in tensors]
-        train_labels = labels.iloc[train_index].values
-        tpls.fit(train_data, train_labels)
+        train_labels = labels.iloc[train_index]
+
+        train_data, train_labels = oversample(train_data, train_labels)
+        tpls.fit(train_data, train_labels.values)
 
         train_transformed = tpls.transform(train_data)
         test_transformed = tpls.transform(test_data)
-        lr_model.fit(train_transformed, train_labels)
-        predicted.iloc[test_index] = lr_model.predict(test_transformed)
+        model.fit(train_transformed, train_labels)
+        predicted.iloc[test_index] = model.predict(test_transformed)
 
         if return_proba:
-            probabilities.iloc[test_index] = lr_model.predict_proba(
+            probabilities.iloc[test_index] = model.predict_proba(
                 test_transformed
             )[:, 1]
 
     acc = accuracy_score(labels, predicted)
     tpls.fit(tensors, labels.values)
-    lr_model.fit(tpls.transform(tensors), labels)
+    model.fit(tpls.transform(tensors), labels)
 
     if return_proba:
-        return (tpls, lr_model), acc, probabilities
+        return (tpls, model), acc, probabilities
     else:
-        return (tpls, lr_model), acc, predicted
+        return (tpls, model), acc, predicted
 
 
 def predict_continuous(data: xr.Dataset, labels: pd.Series):
@@ -126,7 +131,7 @@ def predict_continuous(data: xr.Dataset, labels: pd.Series):
     Fits Elastic Net model and hyperparameters to provided data.
 
     Parameters:
-        data (pandas.DataFrame): Data to predict
+        data (xr.Dataset): Data to predict
         labels (pandas.Series): Labels for provided data
 
     Returns:
@@ -198,21 +203,13 @@ def predict_categorical(
     else:
         data = data[labels.index, :]
 
-    if balanced_resample:
-        undersampler = RandomUnderSampler(
-            sampling_strategy=0.25, random_state=42
-        )
-        data, labels = undersampler.fit_resample(data, labels)
-        oversampler = RandomOverSampler(random_state=42)
-        data, labels = oversampler.fit_resample(data, labels)
-
     model = LogisticRegressionCV(
         l1_ratios=np.linspace(0, 1, 6),
         Cs=10,
         solver="saga",
         penalty="elasticnet",
         n_jobs=-1,
-        cv=rskf,
+        cv=kf,
         max_iter=100000,
         scoring="accuracy",
         multi_class="ovr",
@@ -220,6 +217,7 @@ def predict_categorical(
     model.fit(data, labels)
     coef = model.coef_[0]
     scores = np.mean(list(model.scores_.values())[0], axis=0)
+    acc = np.max(scores)
 
     model = LogisticRegression(
         C=model.C_[0],
@@ -228,17 +226,36 @@ def predict_categorical(
         penalty="elasticnet",
         max_iter=100000,
     )
+
+    if balanced_resample:
+        predicted = pd.Series(index=labels.index)
+        for train_index, test_index in kf.split(data, labels):
+            train_data = data.iloc[train_index, :]
+            train_labels = labels.iloc[train_index]
+            test_data = data.iloc[test_index, :]
+            oversampler = RandomOverSampler(random_state=42)
+            train_data, train_labels = oversampler.fit_resample(
+                train_data, train_labels
+            )
+
+            model.fit(train_data, train_labels)
+            predicted.iloc[test_index] = model.predict(test_data)
+
+        acc = accuracy_score(labels, predicted)
+
     model.fit(data, labels)
 
     if return_coef:
-        return np.max(scores), model, coef
+        return acc, model, coef
     elif return_pred:
-        return np.max(scores), model, model.predict(data), labels
+        return acc, model, model.predict(data), labels
     else:
-        return np.max(scores), model
+        return acc, model
 
 
-def get_probabilities(model, data, labels):
+def get_probabilities(
+    model: BaseEstimator, data: pd.DataFrame, labels: pd.Series
+):
     """
     Returns probabilities of positive classification via cross-validation.
 
@@ -269,9 +286,15 @@ def get_probabilities(model, data, labels):
 
     probabilities = np.zeros(data.shape[0])
     for train_index, test_index in skf.split(data, labels):
-        model.fit(data[train_index, :], labels[train_index])
-        probabilities[test_index] = model.predict_proba(data[test_index, :])[
-            :, 1
-        ]
+        train_data = data[train_index, :]
+        train_labels = labels.iloc[train_index]
+        test_data = data[test_index, :]
+        oversampler = RandomOverSampler(random_state=42)
+        train_data, train_labels = oversampler.fit_resample(
+            train_data, train_labels
+        )
+
+        model.fit(train_data, train_labels)
+        probabilities[test_index] = model.predict_proba(test_data)[:, 1]
 
     return probabilities
