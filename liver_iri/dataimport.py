@@ -3,6 +3,7 @@ from os.path import abspath, dirname, join
 import numpy as np
 import pandas as pd
 import xarray as xr
+from scipy.stats import zscore
 from sklearn.preprocessing import power_transform, scale
 
 REPO_PATH = dirname(dirname(abspath(__file__)))
@@ -39,11 +40,11 @@ def transform_data(data, transform="log"):
 
 # noinspection PyArgumentList
 def cytokine_data(
-    plate_scale: bool = True,
-    transform: str = "log",
+    plate_scale: bool = False,
+    transform: str = "power",
     normalize: bool = True,
     peripheral_scaling: float = 1,
-    pv_scaling: float = 2,
+    pv_scaling: float = 1
 ):
     """
     Import cytokine data into tensor form.
@@ -60,8 +61,10 @@ def cytokine_data(
         xarray.Dataset: cytokine data in tensor form
     """
     df = pd.read_csv(
-        join(REPO_PATH, "liver_iri", "data", "cytokines.csv"), index_col=0
+        join(REPO_PATH, "liver_iri", "data", "cytokines.csv"),
+        index_col=0,
     )
+
     df = df.drop(["IL-3", "MIP-1a"], axis=1)
     visit_types = df.loc[:, "visit"].unique()
 
@@ -77,6 +80,11 @@ def cytokine_data(
         dims=["Patient", "Cytokine Timepoint", "Cytokine"],
     )
 
+    if transform is not None:
+        df[:] = transform_data(df, transform)
+
+    df[:] = zscore(df, axis=1, nan_policy="omit")
+
     if plate_scale:
         for group in meta.loc[:, "plate"].unique():
             group_cytokines = df.loc[meta.loc[:, "plate"] == group, :]
@@ -85,24 +93,28 @@ def cytokine_data(
                 group_cytokines, col_min, np.inf, axis=1
             )
 
-            if transform is not None:
-                group_cytokines[:] = transform_data(group_cytokines, transform)
-
             if normalize:
-                group_cytokines[:] = scale(group_cytokines)
+                group_cytokines[:] = zscore(
+                    group_cytokines, axis=0, nan_policy="omit"
+                )
 
             df.loc[
                 group_cytokines.index, group_cytokines.columns
             ] = group_cytokines
     else:
-        if transform is not None:
-            df[:] = transform_data(df, transform)
-
         if normalize:
-            df[:] = scale(df)
+            pv_tp = meta.loc[:, "visit"].isin(["PV", "LF"])
+            peri_tp = meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"])
+            df.loc[pv_tp, :] = zscore(
+                df.loc[pv_tp, :], axis=0, nan_policy="omit"
+            )
+            df.loc[peri_tp, :] = zscore(
+                df.loc[peri_tp, :], axis=0, nan_policy="omit"
+            )
 
-    for index, meta_row in meta.iterrows():
-        data.loc[meta_row["PID"], meta_row["visit"], :] = df.iloc[index, :]
+    for index in meta.index:
+        meta_row = meta.loc[index, :]
+        data.loc[meta_row["PID"], meta_row["visit"], :] = df.loc[index, :]
 
     data.loc[{"Cytokine Timepoint": ["PV", "LF"]}] *= pv_scaling
     data.loc[
@@ -112,7 +124,9 @@ def cytokine_data(
     return data.to_dataset(name="Cytokine Measurements")
 
 
-def lft_data(transform="power", normalize=True, drop_inr=True):
+def lft_data(
+    transform: str = "power", normalize: bool = True, drop_inr: bool = True
+):
     """
     Import LFT data into tensor form.
 
@@ -156,8 +170,8 @@ def lft_data(transform="power", normalize=True, drop_inr=True):
 
 def build_coupled_tensors(
     peripheral_scaling: float = 1,
-    pv_scaling: float = 1,
-    lft_scaling: float = 1,
+    pv_scaling: float = 0.25,
+    lft_scaling: float = 1 / 6
 ):
     """
     Builds datasets and couples across shared patient dimension.
@@ -172,17 +186,24 @@ def build_coupled_tensors(
     """
     tensors = [
         cytokine_data(
-            peripheral_scaling=peripheral_scaling, pv_scaling=pv_scaling
+            peripheral_scaling=peripheral_scaling,
+            pv_scaling=pv_scaling
         ),
         lft_data() * lft_scaling,
     ]
+    coupled = xr.merge(tensors)
+    coupled = coupled.drop_sel(Patient=90)
 
-    return xr.merge(tensors)
+    return coupled
 
 
-def import_meta():
+def import_meta(long_survival: bool = True):
     """
     Imports patient meta-data.
+
+    Parameters:
+        long_survival (bool, default: True): removes recent patients with
+            unknown outcomes
 
     Returns:
         pandas.DataFrame: patient meta-data
@@ -191,6 +212,13 @@ def import_meta():
         join(REPO_PATH, "liver_iri", "data", "patient_meta.csv"),
         index_col=0,
     )
+
+    if long_survival:
+        rejection = data.loc[data.loc[:, "graft_death"].astype(bool), :]
+        survived = data.loc[~data.loc[:, "graft_death"].astype(bool), :]
+        survived = survived.loc[survived.loc[:, "survival_time"] > 1e3, :]
+
+        data = pd.concat([survived, rejection], axis=0)
 
     data.index = data.index.astype(int)
 
@@ -211,7 +239,8 @@ def import_lfts(score=None, transform="power"):
         pandas.DataFrame: requested liver function test scores
     """
     lft = pd.read_csv(
-        join(REPO_PATH, "liver_iri", "data", "lft_scores.csv"), index_col=0
+        join(REPO_PATH, "liver_iri", "data", "lft_scores.csv"),
+        index_col=0,
     )
 
     if transform is not None:
