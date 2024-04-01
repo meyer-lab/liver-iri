@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_recall_fscore_support, roc_curve
 
-from ..dataimport import (build_coupled_tensors, cytokine_data, import_lfts,
+from ..dataimport import (build_coupled_tensors, cytokine_data, lft_data,
                           import_meta)
 from ..predict import (get_probabilities, oversample, predict_categorical,
                        run_coupled_tpls_classification)
@@ -90,12 +90,9 @@ def plot_accuracies(accuracies, ax, x_label=None, y_label=None):
 def makeFigure():
     meta = import_meta()
     graft = meta.loc[:, "graft_death"]
-    cyto = cytokine_data(
-        transform="log",
-        normalize=False,
-    )
-    lfts = import_lfts()
-    lfts = lfts.loc[meta.index, :]
+
+    cyto = cytokine_data()
+    lfts = lft_data()
 
     matrices = []
     for tp in TIMEPOINTS:
@@ -110,9 +107,13 @@ def makeFigure():
 
     lft_matrices = []
     for tp in LFT_TIMEPOINTS:
-        matrix = lfts.loc[:, lfts.columns.str.contains(tp.lower())]
-        matrix = matrix.loc[np.isfinite(matrix).all(axis=1), :]
-        lft_matrices.append(matrix)
+        lft_matrices.append(
+            lfts.sel({"LFT Timepoint": tp})
+            .to_array()
+            .squeeze()
+            .to_pandas()
+            .loc[meta.index, :]
+        )
     lft_matrices.append(pd.concat(lft_matrices, axis=1))
 
     cyto_names = [TP_CONVERSIONS.get(i, i) for i in TIMEPOINTS] + [
