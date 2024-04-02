@@ -43,13 +43,3 @@ def test_transform_shape():
     """Tests transform_data keeps original data shape"""
     data = transform_data(TEST_DATA)
     assert data.shape == TEST_DATA.shape
-
-
-def test_correct_tensor_patients():
-    """Tests coupled tensor consists of only patients in metadata"""
-    coupled = build_coupled_tensors()
-    meta = import_meta()
-    shared = set(coupled.Patient.values) & set(meta.index)
-
-    assert len(coupled.Patient.values) == len(meta.index)
-    assert len(shared) == len(coupled.Patient.values)

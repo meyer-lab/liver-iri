@@ -3,12 +3,13 @@ from os.path import abspath, dirname, join
 import numpy as np
 import pandas as pd
 import xarray as xr
-from sklearn.preprocessing import power_transform, scale
+from scipy.stats import zscore
+from sklearn.preprocessing import power_transform
 
 REPO_PATH = dirname(dirname(abspath(__file__)))
 
 
-def transform_data(data, transform="log"):
+def transform_data(data: pd.DataFrame, transform: str = "power"):
     """
     Applies transform to provided data.
 
@@ -39,29 +40,36 @@ def transform_data(data, transform="log"):
 
 # noinspection PyArgumentList
 def cytokine_data(
-    plate_scale: bool = True,
-    transform: str = "log",
-    normalize: bool = True,
+    transform: str = "power",
     peripheral_scaling: float = 1,
-    pv_scaling: float = 2,
+    pv_scaling: float = 1,
+    no_missing: bool = True,
 ):
     """
     Import cytokine data into tensor form.
 
     Parameters:
-        plate_scale (bool, default:False): normalizes each plate independently
-        transform (str, default:'log'): specifies transformation to use
-        normalize (bool, default:False): sets zero-mean, variance one
+        transform (str, default:'power'): specifies transformation to use
         peripheral_scaling (float, default:1): scaling to apply to peripheral
             measurements
         pv_scaling (float, default:1): scaling to apply to PV measurements
+        no_missing (bool, default:True): return only patients with all
+            measurements at all time-points
 
     Returns:
         xarray.Dataset: cytokine data in tensor form
     """
-    df = pd.read_csv(
-        join(REPO_PATH, "liver_iri", "data", "cytokines.csv"), index_col=0
-    )
+    if no_missing:
+        df = pd.read_csv(
+            join(REPO_PATH, "liver_iri", "data", "cytokines_no_missing.csv"),
+            index_col=0,
+        )
+    else:
+        df = pd.read_csv(
+            join(REPO_PATH, "liver_iri", "data", "cytokines_validation.csv"),
+            index_col=0,
+        )
+
     df = df.drop(["IL-3", "MIP-1a"], axis=1)
     visit_types = df.loc[:, "visit"].unique()
 
@@ -77,65 +85,69 @@ def cytokine_data(
         dims=["Patient", "Cytokine Timepoint", "Cytokine"],
     )
 
-    if plate_scale:
-        for group in meta.loc[:, "plate"].unique():
-            group_cytokines = df.loc[meta.loc[:, "plate"] == group, :]
-            col_min = np.min(group_cytokines.where(group_cytokines > 0), axis=0)
-            group_cytokines[:] = np.clip(
-                group_cytokines, col_min, np.inf, axis=1
-            )
+    if transform is not None:
+        df[:] = transform_data(df, transform)
 
-            if transform is not None:
-                group_cytokines[:] = transform_data(group_cytokines, transform)
+    df[:] = zscore(df, axis=1, nan_policy="omit")
+    df.loc[meta.loc[:, "visit"].isin(["PV", "LF"]), :] = (
+        zscore(
+            df.loc[meta.loc[:, "visit"].isin(["PV", "LF"]), :],
+            axis=0,
+            nan_policy="omit",
+        )
+        * pv_scaling
+    )
+    df.loc[meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"]), :] = (
+        zscore(
+            df.loc[meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"]), :],
+            axis=0,
+            nan_policy="omit",
+        )
+        * peripheral_scaling
+    )
 
-            if normalize:
-                group_cytokines[:] = scale(group_cytokines)
-
-            df.loc[
-                group_cytokines.index, group_cytokines.columns
-            ] = group_cytokines
-    else:
-        if transform is not None:
-            df[:] = transform_data(df, transform)
-
-        if normalize:
-            df[:] = scale(df)
-
-    for index, meta_row in meta.iterrows():
-        data.loc[meta_row["PID"], meta_row["visit"], :] = df.iloc[index, :]
-
-    data.loc[{"Cytokine Timepoint": ["PV", "LF"]}] *= pv_scaling
-    data.loc[
-        {"Cytokine Timepoint": ["PO", "D1", "W1", "M1"]}
-    ] *= peripheral_scaling
+    for index in meta.index:
+        meta_row = meta.loc[index, :]
+        data.loc[meta_row["PID"], meta_row["visit"], :] = df.loc[index, :]
 
     return data.to_dataset(name="Cytokine Measurements")
 
 
-def lft_data(transform="power", normalize=True, drop_inr=True):
+def lft_data(transform: str = "power", no_missing: bool = True):
     """
     Import LFT data into tensor form.
 
     Parameters:
-        transform (str, default:None): specifies transformation to use
-        normalize (bool, default:False): sets zero-mean, variance one
-        drop_inr (bool, default:True): drops INR measurements
+        transform (str, default:'power'): specifies transformation to use
+        no_missing (bool, default:True): return only patients with all
+            measurements at all time-points
 
     Returns:
         xarray.Dataset: RNA expression data in tensor form
     """
-    lfts = import_lfts(transform=transform)
-    lfts.index = lfts.index.astype(int)
-
-    if drop_inr is not None:
-        lfts = lfts.loc[:, ~lfts.columns.str.contains("inr")]
-        scores = ["ast", "alt", "tbil"]
+    if no_missing:
+        lfts = pd.read_csv(
+            join(REPO_PATH, "liver_iri", "data", "lft_scores_no_missing.csv"),
+            index_col=0,
+        )
     else:
-        scores = ["ast", "alt", "inr", "tbil"]
+        lfts = pd.read_csv(
+            join(REPO_PATH, "liver_iri", "data", "lft_scores_validation.csv"),
+            index_col=0,
+        )
+
+    lfts = lfts.loc[:, ~lfts.columns.str.contains("inr")]
+    if transform is not None:
+        lfts.loc[:, ~lfts.columns.str.contains("inr")] = transform_data(
+            lfts.loc[:, ~lfts.columns.str.contains("inr")], transform
+        )
+
+    lfts.index = lfts.index.astype(int)
+    scores = ["ast", "alt", "tbil"]
 
     patients = lfts.index.values
-    if normalize:
-        lfts[:] = scale(lfts)
+    lfts[:] = zscore(lfts, nan_policy="omit", axis=1)
+    lfts[:] = zscore(lfts, nan_policy="omit", axis=0)
 
     data = xr.DataArray(
         coords={
@@ -156,8 +168,9 @@ def lft_data(transform="power", normalize=True, drop_inr=True):
 
 def build_coupled_tensors(
     peripheral_scaling: float = 1,
-    pv_scaling: float = 1,
-    lft_scaling: float = 1,
+    pv_scaling: float = 0.25,
+    lft_scaling: float = 1 / 6,
+    no_missing: bool = True,
 ):
     """
     Builds datasets and couples across shared patient dimension.
@@ -166,68 +179,57 @@ def build_coupled_tensors(
         peripheral_scaling (float, default: 1): peripheral cytokine scaling
         pv_scaling (float, default: 1): PV cytokine scaling
         lft_scaling (float, default: 1): LFT scaling
+        no_missing (bool, default:True): return only patients with all
+            measurements at all time-points
 
     Returns:
         xr.Dataset: coupled datasets merged into one object
     """
     tensors = [
         cytokine_data(
-            peripheral_scaling=peripheral_scaling, pv_scaling=pv_scaling
+            peripheral_scaling=peripheral_scaling,
+            pv_scaling=pv_scaling,
+            no_missing=no_missing,
         ),
-        lft_data() * lft_scaling,
+        lft_data(no_missing=no_missing) * lft_scaling,
     ]
+    coupled = xr.merge(tensors)
+    coupled = coupled.drop_sel(Patient=90)
 
-    return xr.merge(tensors)
+    return coupled
 
 
-def import_meta():
+def import_meta(long_survival: bool = True, no_missing: bool = True):
     """
     Imports patient meta-data.
+
+    Parameters:
+        long_survival (bool, default: True): removes recent patients with
+            unknown outcomes
+        no_missing (bool, default:True): return only patients with all
+            measurements at all time-points
 
     Returns:
         pandas.DataFrame: patient meta-data
     """
-    data = pd.read_csv(
-        join(REPO_PATH, "liver_iri", "data", "patient_meta.csv"),
-        index_col=0,
-    )
+    if no_missing:
+        data = pd.read_csv(
+            join(REPO_PATH, "liver_iri", "data", "patient_meta_no_missing.csv"),
+            index_col=0,
+        )
+    else:
+        data = pd.read_csv(
+            join(REPO_PATH, "liver_iri", "data", "patient_meta_validation.csv"),
+            index_col=0,
+        )
+
+    if long_survival:
+        rejection = data.loc[data.loc[:, "graft_death"].astype(bool), :]
+        survived = data.loc[~data.loc[:, "graft_death"].astype(bool), :]
+        survived = survived.loc[survived.loc[:, "survival_time"] > 1e3, :]
+        data = pd.concat([survived, rejection], axis=0)
 
     data.index = data.index.astype(int)
+    data = data.drop(90)
 
     return data
-
-
-def import_lfts(score=None, transform="power"):
-    """
-    Imports liver function test scores.
-
-    Parameters:
-        score (str, default:None): liver function test to return; if 'None' is
-            passed, returns all liver function tests; if provided, must be one
-            of 'alt', 'ast', 'inr', or 'tbil'
-        transform (str, default:'log'): transform to apply
-
-    Returns:
-        pandas.DataFrame: requested liver function test scores
-    """
-    lft = pd.read_csv(
-        join(REPO_PATH, "liver_iri", "data", "lft_scores.csv"), index_col=0
-    )
-
-    if transform is not None:
-        lft.loc[:, ~lft.columns.str.contains("inr")] = transform_data(
-            lft.loc[:, ~lft.columns.str.contains("inr")], transform
-        )
-        lft.index = lft.index.astype(str)
-
-    if score is not None:
-        score = score.lower()
-        if score not in ["alt", "ast", "inr", "tbil"]:
-            raise ValueError(
-                'score must be one of "alt", "ast", "inr", or "tbil"'
-            )
-        lft = lft.loc[:, lft.columns.str.contains(score)]
-
-    lft.index = lft.index.astype(int)
-
-    return lft

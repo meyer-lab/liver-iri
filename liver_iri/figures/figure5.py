@@ -57,11 +57,10 @@ def plot_coefficients(coefs, ax):
 
 
 def makeFigure():
+    cyto = cytokine_data()
     meta = import_meta()
+    cyto = cyto.sel(Patient=meta.index)
     graft = meta.loc[:, "graft_death"]
-    cyto = cytokine_data(
-        normalize=False,
-    )
 
     matrices = []
     for tp in TIMEPOINTS:
