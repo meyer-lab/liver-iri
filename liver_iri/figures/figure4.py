@@ -5,18 +5,66 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import roc_curve
+from sklearn.preprocessing import LabelEncoder
 
 from ..dataimport import (build_coupled_tensors, cytokine_data, lft_data,
                           import_meta)
-from ..predict import predict_categorical, run_coupled_tpls_classification
+from ..predict import (predict_categorical, predict_continuous,
+                       run_coupled_tpls_classification)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
 
-LFT_TIMEPOINTS = ["Opening", "1", "2", "3", "4", "5", "6", "7"]
+CATEGORICAL = ["dsx", "rsx", "rrc", "abox", "iri"]
 CYTO_TIMEPOINTS = ["PO", "D1", "W1", "M1", "LF", "PV"]
+LFT_TIMEPOINTS = ["Opening", "1", "2", "3", "4", "5", "6", "7"]
 METHODS = ["LFTs", "PV Cytokines", "Peripheral Cytokines", "tPLS"]
+REGRESSION = ["dage", "rag", "dtbili", "dalt", "cit", "wit", "txmeld"]
+TRANSLATIONS = {
+    "dsx": "Donor Sex",
+    "dage": "Donor Age",
+    "dtbili": "Donor TBIL",
+    "dalt": "Donor ALT",
+    "abox": "ABO\nCompatibility",
+    "cit": "Cold\nIschemia Time",
+    "wit": "Warm\nIschemia Time",
+    "txmeld": "Transplant\nMELD Score",
+    "rrc": "Race",
+    "iri": "LIRI > 1",
+    "graft_death": "Graft Death",
+    "rsx": "Recipient Sex",
+    "rag": "Recipient Age",
+    "liri": "LIRI",
+}
+
+
+def get_clinical_accuracies(factors, meta):
+    encoder = LabelEncoder()
+    accuracies = pd.Series()
+    q2ys = pd.Series()
+
+    for target in CATEGORICAL:
+        labels = meta.loc[:, target]
+        labels = labels.dropna()
+        labels[:] = encoder.fit_transform(labels)
+        labels = labels.astype(int)
+
+        data = factors.loc[labels.index, :]
+        score, _, _ = predict_categorical(
+            data, labels
+        )
+        accuracies.loc[target] = score
+
+    for target in REGRESSION:
+        labels = meta.loc[:, target]
+        labels = labels.dropna()
+
+        data = factors.loc[labels.index, :]
+        score, _ = predict_continuous(data, labels)
+        q2ys.loc[target] = score
+
+    return accuracies, q2ys
 
 
 def makeFigure():
@@ -24,8 +72,8 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    fig_size = (6, 6)
-    layout = {"nrows": 2, "ncols": 2}
+    fig_size = (9, 6)
+    layout = {"nrows": 2, "ncols": 3}
     axs, fig = getSetup(fig_size, layout)
 
     ############################################################################
@@ -102,7 +150,7 @@ def makeFigure():
     # Figures 4C/4D: Bar and ROC plots
     ############################################################################
 
-    (_, _), tpls_acc, tpls_proba = run_coupled_tpls_classification(
+    (tpls, _), tpls_acc, tpls_proba = run_coupled_tpls_classification(
         tensors, labels, return_proba=True
     )
 
@@ -208,5 +256,42 @@ def makeFigure():
     ax.set_ylim([0, 1])
     ax.set_xlabel('False Positive Rate')
     ax.set_ylabel('True Positive Rate')
+
+    ############################################################################
+    # Figures 4E/4F: Clinical Predictions
+    ############################################################################
+
+    patient_factors = pd.DataFrame(
+        tpls.Xs_factors[0][0],
+        index=labels.index,
+        columns=np.arange(tpls.n_components) + 1
+    )
+    accuracies, q2ys = get_clinical_accuracies(
+        patient_factors,
+        meta
+    )
+
+    accuracies = accuracies.sort_values(ascending=True)
+    q2ys = q2ys.sort_values(ascending=True)
+
+    ax = axs[4]
+    ax.bar(np.arange(len(accuracies)), accuracies)
+
+    ticks = [TRANSLATIONS[metric] for metric in accuracies.index]
+    ax.set_xticks(range(len(accuracies)))
+    ax.set_xticklabels(ticks, rotation=45, va="top", ha="right")
+
+    ax.set_ylim([0, 1])
+    ax.set_xlim([-0.5, len(accuracies) - 0.5])
+
+    ax = axs[5]
+    ax.bar(np.arange(len(q2ys)), q2ys)
+
+    ticks = [TRANSLATIONS[metric] for metric in q2ys.index]
+    ax.set_xticks(range(len(q2ys)))
+    ax.set_xticklabels(ticks, rotation=45, va="top", ha="right")
+
+    ax.set_ylim([0, 1])
+    ax.set_xlim([-0.5, len(q2ys) - 0.5])
 
     return fig

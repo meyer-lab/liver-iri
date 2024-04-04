@@ -44,11 +44,12 @@ def get_accuracies(factors, meta):
     for target in CATEGORICAL:
         labels = meta.loc[:, target]
         labels = labels.dropna()
+        labels[:] = encoder.fit_transform(labels)
+        labels = labels.astype(int)
 
-        encoded = encoder.fit_transform(labels)
         data = factors.loc[labels.index, :]
-        score, model = predict_categorical(
-            data, encoded, balanced_resample=False
+        score, model, _ = predict_categorical(
+            data, labels
         )
         models[target] = model
 

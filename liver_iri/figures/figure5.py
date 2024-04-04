@@ -67,7 +67,9 @@ def makeFigure():
     )
     tpls.fit(oversampled_tensors, oversampled_labels.values)
 
+    ############################################################################
     # Figure 5A: Patient factors
+    ############################################################################
 
     ax = axs[0]
     factor = tpls.transform(all_tensors)
