@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import norm
 import pandas as pd
 import xarray as xr
 from tensorpack import perform_CP
@@ -7,6 +8,24 @@ from tensorpack.coupled import CoupledTensor
 from liver_iri.dataimport import build_coupled_tensors
 
 OPTIMAL_RANK = 4
+
+
+def calc_r2x(actual: np.ndarray, reconstructed: np.ndarray):
+    """
+    Calculates R2X of reconstruction.
+
+    Parameters:
+        actual (np.ndarray): actual tensor
+        reconstructed (np.ndarray): reconstructed tensor
+
+    Returns:
+        R2X (float): reconstruction fidelity
+    """
+    mask = np.isfinite(actual)
+    actual = np.nan_to_num(actual)
+    top = norm(reconstructed * mask - actual) ** 2
+    bottom = norm(actual) ** 2
+    return 1 - top / bottom
 
 
 def run_cp(data, rank=OPTIMAL_RANK):
@@ -64,7 +83,7 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
         decomposer = CoupledTensor(data, rank)
         decomposer.initialize(method="randomized_svd")
 
-    decomposer.fit(nonneg=nonneg, tol=1e-6, maxiter=2500)
+    decomposer.fit(nonneg=nonneg, tol=1e-6, maxiter=2500, progress=False)
     decomposer.normalize_factors()
     factors = decomposer.x._Patient.to_pandas()
 

@@ -7,6 +7,7 @@ import time
 from string import ascii_lowercase
 
 import matplotlib
+import numpy as np
 import seaborn as sns
 import svgutils.transform as st
 from matplotlib import gridspec
@@ -71,7 +72,7 @@ def getSetup(figsize, gridd, multz=None, empts=None, style="whitegrid"):
             x += multz[x]
         x += 1
 
-    return ax, f
+    return np.array(ax), f
 
 
 def subplotLabel(axs):
