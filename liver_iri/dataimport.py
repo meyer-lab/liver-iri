@@ -146,7 +146,6 @@ def lft_data(transform: str = "power", no_missing: bool = True):
     scores = ["ast", "alt", "tbil"]
 
     patients = lfts.index.values
-    lfts[:] = zscore(lfts, nan_policy="omit", axis=1)
     lfts[:] = zscore(lfts, nan_policy="omit", axis=0)
 
     data = xr.DataArray(
@@ -194,7 +193,9 @@ def build_coupled_tensors(
         lft_data(no_missing=no_missing) * lft_scaling,
     ]
     coupled = xr.merge(tensors)
-    coupled = coupled.drop_sel(Patient=90)
+
+    if no_missing:
+        coupled = coupled.drop_sel(Patient=90)
 
     return coupled
 
@@ -217,19 +218,19 @@ def import_meta(long_survival: bool = True, no_missing: bool = True):
             join(REPO_PATH, "liver_iri", "data", "patient_meta_no_missing.csv"),
             index_col=0,
         )
+        data.index = data.index.astype(int)
+        data = data.drop(90)
     else:
         data = pd.read_csv(
             join(REPO_PATH, "liver_iri", "data", "patient_meta_validation.csv"),
             index_col=0,
         )
+        data.index = data.index.astype(int)
 
     if long_survival:
         rejection = data.loc[data.loc[:, "graft_death"].astype(bool), :]
         survived = data.loc[~data.loc[:, "graft_death"].astype(bool), :]
         survived = survived.loc[survived.loc[:, "survival_time"] > 1e3, :]
         data = pd.concat([survived, rejection], axis=0)
-
-    data.index = data.index.astype(int)
-    data = data.drop(90)
 
     return data

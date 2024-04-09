@@ -165,8 +165,7 @@ def predict_continuous(data: xr.Dataset, labels: pd.Series):
 def predict_categorical(
     data: pd.DataFrame,
     labels: pd.Series,
-    return_coef: bool = False,
-    return_pred: bool = False,
+    return_proba: bool = False,
     balanced_resample: bool = True,
 ):
     """
@@ -175,8 +174,7 @@ def predict_categorical(
     Parameters:
         data (pandas.DataFrame): Data to predict
         labels (pandas.Series): Labels for provided data
-        return_coef (bool, default: False): Return model coefficients
-        return_pred (bool, default: False): Return predictions
+        return_proba (bool, default: False): Return predictions
         balanced_resample (bool, default:False): under-/over-samples data to
             form balanced dataset
 
@@ -186,38 +184,21 @@ def predict_categorical(
             optimized to predict provided data and labels
         return_coef (numpy.array): LR coefficients for each feature
     """
-    np.random.seed(21517)
-
-    if isinstance(labels, pd.Series):
-        labels = labels.reset_index(drop=True)
-    else:
-        labels = pd.Series(labels)
-
-    labels = labels[labels != "Unknown"]
-
-    if isinstance(data, pd.Series):
-        data = data.iloc[labels.index]
-        data = data.values.reshape(-1, 1)
-    elif isinstance(data, pd.DataFrame):
-        data = data.iloc[labels.index, :]
-    else:
-        data = data[labels.index, :]
-
     model = LogisticRegressionCV(
         l1_ratios=np.linspace(0, 1, 6),
         Cs=10,
         solver="saga",
         penalty="elasticnet",
         n_jobs=-1,
-        cv=kf,
+        cv=skf,
         max_iter=100000,
-        scoring="accuracy",
+        scoring="balanced_accuracy",
         multi_class="ovr",
     )
     model.fit(data, labels)
-    coef = model.coef_[0]
-    scores = np.mean(list(model.scores_.values())[0], axis=0)
-    acc = np.max(scores)
+
+    if balanced_resample:
+        oversampler = RandomOverSampler(random_state=42)
 
     model = LogisticRegression(
         C=model.C_[0],
@@ -226,31 +207,33 @@ def predict_categorical(
         penalty="elasticnet",
         max_iter=100000,
     )
+    predicted = pd.Series(index=labels.index)
+    for train_index, test_index in skf.split(data, labels):
+        train_data = data.iloc[train_index, :]
+        train_labels = labels.iloc[train_index]
+        test_data = data.iloc[test_index, :]
 
-    if balanced_resample:
-        predicted = pd.Series(index=labels.index)
-        for train_index, test_index in kf.split(data, labels):
-            train_data = data.iloc[train_index, :]
-            train_labels = labels.iloc[train_index]
-            test_data = data.iloc[test_index, :]
-            oversampler = RandomOverSampler(random_state=42)
+        if balanced_resample:
             train_data, train_labels = oversampler.fit_resample(
                 train_data, train_labels
             )
 
-            model.fit(train_data, train_labels)
+        model.fit(train_data, train_labels)
+        if return_proba:
+            predicted.iloc[test_index] = model.predict_proba(
+                test_data
+            )[:, 1]
+        else:
             predicted.iloc[test_index] = model.predict(test_data)
 
+    if return_proba:
+        acc = accuracy_score(labels, predicted.round())
+    else:
         acc = accuracy_score(labels, predicted)
 
     model.fit(data, labels)
 
-    if return_coef:
-        return acc, model, coef
-    elif return_pred:
-        return acc, model, model.predict(data), labels
-    else:
-        return acc, model
+    return acc, model, predicted
 
 
 def get_probabilities(
