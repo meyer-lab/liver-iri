@@ -52,6 +52,7 @@ def run_coupled_tpls_classification(
     labels: pd.Series,
     rank: int = OPTIMAL_TPLS,
     return_proba: bool = False,
+    return_components: bool = False,
 ):
     """
     Fits coupled tPLS model to provided data and labels.
@@ -62,6 +63,8 @@ def run_coupled_tpls_classification(
         rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
         return_proba (bool, default:False): returns probability of each
             patient's classification
+        return_components (bool, default:False): returns patient component
+            factors
 
     Returns:
         models (tuple[tPLS, LR classifier]): tuple of trained tPLS and LR model
@@ -71,6 +74,9 @@ def run_coupled_tpls_classification(
         proba (pd.Series, only returns if return_proba): probability of positive
             classification for each patient
     """
+    if return_proba and return_components:
+        return_components = False
+
     np.random.seed(215)
     tpls = ctPLS(n_components=rank)
     tpls.fit(tensors, labels.values)
@@ -78,6 +84,10 @@ def run_coupled_tpls_classification(
     predicted = pd.Series(0, index=labels.index)
     if return_proba:
         probabilities = predicted.copy()
+    elif return_components:
+        components = pd.DataFrame(
+            0, index=labels.index, columns=np.arange(rank) + 1
+        )
 
     model = LogisticRegressionCV(
         l1_ratios=np.linspace(0, 1, 11),
@@ -115,6 +125,8 @@ def run_coupled_tpls_classification(
             probabilities.iloc[test_index] = model.predict_proba(
                 test_transformed
             )[:, 1]
+        elif return_components:
+            components.iloc[test_index, :] = test_transformed
 
     acc = accuracy_score(labels, predicted)
     tpls.fit(tensors, labels.values)
@@ -122,6 +134,8 @@ def run_coupled_tpls_classification(
 
     if return_proba:
         return (tpls, model), acc, probabilities
+    elif return_components:
+        return (tpls, model), acc, components
     else:
         return (tpls, model), acc, predicted
 
@@ -184,6 +198,9 @@ def predict_categorical(
             optimized to predict provided data and labels
         return_coef (numpy.array): LR coefficients for each feature
     """
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+
     model = LogisticRegressionCV(
         l1_ratios=np.linspace(0, 1, 6),
         Cs=10,
@@ -195,7 +212,10 @@ def predict_categorical(
         scoring="balanced_accuracy",
         multi_class="ovr",
     )
-    model.fit(data, labels)
+    if data.shape[1] < 2:
+        model.fit(data.values.reshape(-1, 1), labels)
+    else:
+        model.fit(data, labels)
 
     if balanced_resample:
         oversampler = RandomOverSampler(random_state=42)
@@ -218,11 +238,13 @@ def predict_categorical(
                 train_data, train_labels
             )
 
-        model.fit(train_data, train_labels)
+        if data.shape[1] < 2:
+            model.fit(train_data.values.reshape(-1, 1), train_labels)
+        else:
+            model.fit(train_data, train_labels)
+
         if return_proba:
-            predicted.iloc[test_index] = model.predict_proba(
-                test_data
-            )[:, 1]
+            predicted.iloc[test_index] = model.predict_proba(test_data)[:, 1]
         else:
             predicted.iloc[test_index] = model.predict(test_data)
 
