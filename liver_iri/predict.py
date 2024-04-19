@@ -1,24 +1,18 @@
 import warnings
 
+from lifelines import CoxPHFitter
+from lifelines.utils import concordance_index
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator
 import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.linear_model import (
-    ElasticNet,
-    ElasticNetCV,
-    LogisticRegression,
-    LogisticRegressionCV,
-)
+from sklearn.base import BaseEstimator
+from sklearn.linear_model import (ElasticNet, ElasticNetCV, LogisticRegression,
+                                  LogisticRegressionCV)
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import (
-    KFold,
-    LeaveOneOut,
-    StratifiedKFold,
-    cross_val_predict,
-)
+from sklearn.model_selection import (KFold, LeaveOneOut, StratifiedKFold,
+                                     cross_val_predict)
 
 warnings.filterwarnings("ignore")
 
@@ -28,20 +22,34 @@ kf = KFold(n_splits=10)
 skf = StratifiedKFold(n_splits=20)
 
 
-def oversample(tensors: list[np.ndarray], labels: pd.Series):
+def oversample(
+    tensors: list[np.ndarray],
+    labels: pd.Series,
+    column: str = None
+):
     """
     Over-/under-samples tensor data to form balanced dataset.
 
     Parameters:
         tensors (list of np.ndarray): coupled tensors
         labels (pd.Series): labels for patients in tensors
+        column (str): column to balance
 
     Returns:
         Over-/under-sampled tensors and labels
     """
     oversampler = RandomOverSampler(random_state=42)
-    oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
-    tensors = [tensor[oversampler.sample_indices_, :, :] for tensor in tensors]
+    if column is None:
+        oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
+    else:
+        oversampler.fit_resample(
+            labels.loc[:, column].values.reshape(-1, 1),
+            labels.loc[:, column]
+        )
+
+    tensors = [
+        tensor[oversampler.sample_indices_, :, :] for tensor in tensors
+    ]
     labels = labels.iloc[oversampler.sample_indices_]
 
     return tensors, labels
@@ -138,6 +146,120 @@ def run_coupled_tpls_classification(
         return (tpls, model), acc, components
     else:
         return (tpls, model), acc, predicted
+
+
+def run_tpls_survival(
+    tensors: list[np.ndarray],
+    labels: pd.DataFrame,
+    rank: int = OPTIMAL_TPLS
+):
+    """
+    Runs survival regression via coupled tPLS.
+
+    Parameters:
+        tensors (list of np.ndarray): coupled tensors
+        labels (pd.DataFrame): labels to regress data against
+        rank (int, default:OPTIMAL_TPLS): number of components to use in tPLS
+
+    Returns:
+        models (tuple[tPLS, LR classifier]): tuple of trained tPLS and LR model
+        acc (float): accuracy achieved over cross-validation
+        pred (pd.Series, only returns if not return_proba): predicted value for
+            each patient
+        proba (pd.Series, only returns if return_proba): probability of positive
+            classification for each patient
+    """
+    np.random.seed(215)
+    tpls = ctPLS(n_components=rank)
+    tpls.fit(tensors, labels.values)
+    predicted = pd.Series(0, index=labels.index)
+    model = CoxPHFitter(penalizer=0.05, l1_ratio=0.2)
+
+    for train_index, test_index in skf.split(
+        labels.loc[:, "graft_death"],
+        labels.loc[:, "graft_death"]
+    ):
+        train_data = [tensor[train_index, :, :] for tensor in tensors]
+        test_data = [tensor[test_index, :, :] for tensor in tensors]
+        train_labels = labels.iloc[train_index, :]
+
+        train_data, train_labels = oversample(
+            train_data,
+            train_labels,
+            column="graft_death"
+        )
+        tpls.fit(train_data, train_labels.values)
+
+        train_transformed = tpls.transform(train_data)
+        test_transformed = tpls.transform(test_data)
+
+        train_transformed = pd.DataFrame(
+            train_transformed,
+            index=train_labels.index,
+            columns=np.arange(tpls.n_components) + 1
+        )
+        train_transformed = pd.concat(
+            [train_transformed, train_labels],
+            axis=1
+        )
+        model.fit(
+            train_transformed,
+            duration_col="survival_time",
+            event_col="graft_death"
+        )
+        predicted.iloc[test_index] = model.predict_expectation(test_transformed)
+
+    c_index = concordance_index(
+        labels.loc[:, "survival_time"],
+        predicted,
+        labels.loc[:, "graft_death"]
+    )
+
+    return (tpls, model), c_index, predicted
+
+
+def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
+    """
+    Runs survival regression.
+
+    Parameters:
+        data (pd.DataFrame): data to regress
+        labels (pd.DataFrame): labels to regress data against
+    """
+    np.random.seed(215)
+    model = CoxPHFitter(penalizer=0.05, l1_ratio=0.2)
+    oversampler = RandomOverSampler(random_state=42)
+
+    data = data.dropna(axis=0)
+    labels = labels.loc[data.index, :]
+    predicted = pd.Series(0, index=labels.index)
+
+    for train_index, test_index in skf.split(
+        labels.loc[:, "graft_death"],
+        labels.loc[:, "graft_death"]
+    ):
+        train_data = data.iloc[train_index, :]
+        test_data = data.iloc[test_index, :]
+        train_labels = labels.iloc[train_index, :]
+
+        oversampler.fit_resample(train_data, train_labels.loc[:, "graft_death"])
+        train_data = train_data.iloc[oversampler.sample_indices_, :]
+        train_labels = train_labels.iloc[oversampler.sample_indices_, :]
+        train_data = pd.concat([train_data, train_labels], axis=1)
+        model.fit(
+            train_data,
+            duration_col="survival_time",
+            event_col="graft_death"
+        )
+        predicted.iloc[test_index] = model.predict_expectation(test_data)
+
+    c_index = concordance_index(
+        labels.loc[:, "survival_time"],
+        predicted,
+        labels.loc[:, "graft_death"]
+    )
+
+    return model, c_index, predicted
 
 
 def predict_continuous(data: xr.Dataset, labels: pd.Series):
