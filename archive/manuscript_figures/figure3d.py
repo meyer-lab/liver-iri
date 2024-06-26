@@ -1,4 +1,4 @@
-"""Plots Figure 3b -- NK / LFT Association"""
+"""Plots Figure 3d -- Granulocyte / LFT Association"""
 from decimal import Decimal
 import warnings
 
@@ -12,53 +12,6 @@ from ..predict import predict_continuous
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
-
-
-def plot_scatter(df, meta, ax):
-    df = df.dropna(axis=0)
-    meta = meta.loc[df.index, :]
-
-    ax.scatter(
-        df.iloc[:, 0],
-        df.iloc[:, 1],
-        s=6,
-        c=meta.loc[:, "graft_death"].replace(
-            {
-                1: "red",
-                0: "green"
-            }
-        )
-    )
-
-    score, model = predict_continuous(
-        df.iloc[:, 0],
-        df.iloc[:, 1]
-    )
-
-    x_lims = ax.get_xlim()
-    y_lims = ax.get_ylim()
-
-    ax.set_xlabel(df.columns[0])
-    ax.set_ylabel(df.columns[1])
-
-    xs = [0, df.iloc[:, 0].max() * 1.05]
-    ys = [
-        model.params.iloc[0] + model.params.iloc[1] * xs[0],
-        model.params.iloc[0] + model.params.iloc[1] * xs[1]
-    ]
-    ax.plot(xs, ys, color="k", linestyle="--")
-
-    ax.text(
-        0.98,
-        0.02,
-        s=f"R2: {round(score, 3)}\np-value: {Decimal(model.pvalues[1]):.2E}",
-        ha="right",
-        ma="right",
-        va="bottom",
-        transform=ax.transAxes
-    )
-    ax.set_xlim(x_lims)
-    ax.set_ylim(y_lims)
 
 
 def makeFigure():
@@ -84,22 +37,21 @@ def makeFigure():
     cytokine_measurements = raw_data["Cytokine Measurements"]
     lft_measurements = raw_data["LFT Measurements"]
 
-    meta = import_meta(long_survival=False, no_missing=True)
-    val_meta = import_meta(long_survival=False, no_missing=False)
-    meta = pd.concat([meta, val_meta])
-
     axs, fig = getSetup(
         (3, 3),
         {"nrows": 1, "ncols": 1}
     )
     ax = axs[0]
 
-    il_15 = cytokine_measurements.loc[
+    il_17a = cytokine_measurements.loc[
         {
-            "Cytokine": "IL-15",
-            "Cytokine Timepoint": "PV"
+            "Cytokine": "IL-17A",
+            "Cytokine Timepoint": "PO"
         }
     ].squeeze().to_pandas()
+    il_17a = il_17a.loc[
+        il_17a > 2
+    ]
 
     for lft_index, lft_score in enumerate(lft_measurements["LFT Score"].values):
         lfts = lft_measurements.loc[
@@ -110,15 +62,14 @@ def makeFigure():
         ].squeeze().to_pandas()
         correlations = []
         for lft_tp in lfts.columns:
-            df = pd.concat([il_15, lfts.loc[:, lft_tp]], axis=1)
+            df = pd.concat([il_17a, lfts.loc[:, lft_tp]], axis=1)
             df = df.dropna(axis=0)
             result = pearsonr(
                 df.iloc[:, 0],
                 df.iloc[:, 1]
             )
-            correlations.append(result.pvalue)
+            correlations.append(result.statistic)
 
-        correlations = -np.log(correlations)
         ax.bar(
             np.arange(lft_index, len(correlations) * 4, 4),
             correlations,
@@ -127,14 +78,7 @@ def makeFigure():
         )
 
     x_lims = ax.get_xlim()
-    ax.plot(
-        [-100, 100],
-        [-np.log(0.05)] * 2,
-        linestyle="--",
-        color="k",
-        zorder=-3
-    )
-
+    ax.plot([-100, 100], [0, 0], linestyle="--", color="k")
     ax.set_xlim(x_lims)
 
     ax.set_xticks(np.arange(1, lfts.shape[1] * 4, 4))
@@ -148,7 +92,7 @@ def makeFigure():
         rotation=45
     )
 
-    ax.set_ylabel("-log(p-value)")
+    ax.set_ylabel("Pearson Correlation")
     ax.legend()
 
     return fig

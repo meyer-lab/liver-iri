@@ -1,17 +1,23 @@
 """
 This file contains functions that are used in multiple figures.
 """
+from decimal import Decimal
+
 import logging
 import sys
 import time
 from string import ascii_lowercase
 
+from matplotlib.axes import Axes
 import matplotlib
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import svgutils.transform as st
 from matplotlib import gridspec
 from matplotlib import pyplot as plt
+
+from ..predict import predict_continuous
 
 matplotlib.use("AGG")
 
@@ -118,3 +124,52 @@ def overlayCartoon(figFile, cartoonFile, x, y, scalee=1):
 
     template.append(cartoon)
     template.save(figFile)
+
+
+def plot_scatter(df: pd.DataFrame, ax: Axes):
+    """
+    Plots scatter with regression line.
+
+    Args:
+        df (pd.DataFrame): data to plot; each column corresponds to a variable
+        ax (matplotlib.ax.Axes): ax to plot to
+
+    Returns:
+        None. Modifies provided ax.
+    """
+    df = df.dropna(axis=0)
+    score, model = predict_continuous(
+        df.iloc[:, 0],
+        df.iloc[:, 1]
+    )
+
+    ax.scatter(
+        df.iloc[:, 0],
+        df.iloc[:, 1],
+        s=6
+    )
+
+    x_lim = ax.get_xlim()
+    y_lim = ax.get_ylim()
+
+    xs = [0, df.iloc[:, 0].max() * 1.05]
+    ys = [
+        model.params.iloc[0] + model.params.iloc[1] * xs[0],
+        model.params.iloc[0] + model.params.iloc[1] * xs[1]
+    ]
+    ax.plot(xs, ys, color="k", linestyle="--")
+
+    ax.set_xlabel(df.columns[0])
+    ax.set_ylabel(df.columns[1])
+
+    ax.text(
+        0.98,
+        0.02,
+        s=f"R2: {round(score, 3)}\np-value: {Decimal(model.pvalues[1]):.2E}",
+        ha="right",
+        ma="right",
+        va="bottom",
+        transform=ax.transAxes
+    )
+    ax.set_xlim(x_lim)
+    ax.set_ylim(y_lim)
