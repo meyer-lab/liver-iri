@@ -126,13 +126,14 @@ def overlayCartoon(figFile, cartoonFile, x, y, scalee=1):
     template.save(figFile)
 
 
-def plot_scatter(df: pd.DataFrame, ax: Axes):
+def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series = None):
     """
     Plots scatter with regression line.
 
     Args:
         df (pd.DataFrame): data to plot; each column corresponds to a variable
         ax (matplotlib.ax.Axes): ax to plot to
+        cmap (pd.Series): colormap colors
 
     Returns:
         None. Modifies provided ax.
@@ -143,11 +144,20 @@ def plot_scatter(df: pd.DataFrame, ax: Axes):
         df.iloc[:, 1]
     )
 
-    ax.scatter(
-        df.iloc[:, 0],
-        df.iloc[:, 1],
-        s=6
-    )
+    if cmap is None:
+        ax.scatter(
+            df.iloc[:, 0],
+            df.iloc[:, 1],
+            s=6
+        )
+    else:
+        ax.scatter(
+            df.iloc[:, 0],
+            df.iloc[:, 1],
+            c=cmap.loc[df.index],
+            cmap="coolwarm",
+            s=6
+        )
 
     x_lim = ax.get_xlim()
     y_lim = ax.get_ylim()
@@ -157,8 +167,8 @@ def plot_scatter(df: pd.DataFrame, ax: Axes):
         model.params.iloc[0] + model.params.iloc[1] * xs[0],
         model.params.iloc[0] + model.params.iloc[1] * xs[1]
     ]
-    ax.plot(xs, ys, color="k", linestyle="--")
 
+    ax.plot(xs, ys, color="k", linestyle="--")
     ax.set_xlabel(df.columns[0])
     ax.set_ylabel(df.columns[1])
 
