@@ -8,11 +8,12 @@ import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.base import BaseEstimator
-from sklearn.linear_model import (ElasticNet, ElasticNetCV, LogisticRegression,
-                                  LogisticRegressionCV)
-from sklearn.metrics import accuracy_score
+from sklearn.linear_model import (ElasticNet, ElasticNetCV, LinearRegression,
+                                  LogisticRegression, LogisticRegressionCV)
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, r2_score
 from sklearn.model_selection import (KFold, LeaveOneOut, StratifiedKFold,
                                      cross_val_predict)
+import statsmodels.api as sm
 
 warnings.filterwarnings("ignore")
 
@@ -285,17 +286,11 @@ def predict_continuous(data: xr.Dataset, labels: pd.Series):
     else:
         data = data[labels.index, :]
 
-    model = ElasticNetCV()
-    model.fit(data, labels)
+    data = sm.add_constant(data)
+    model = sm.OLS(labels, data, missing="drop")
+    results = model.fit()
 
-    loo = LeaveOneOut()
-    model = ElasticNet(alpha=model.alpha_, l1_ratio=model.l1_ratio_)
-    predicted = cross_val_predict(model, data, labels, cv=loo)
-    numerator = sum(predicted**2)
-    denominator = sum(labels**2)
-    q2y = 1 - numerator / denominator
-
-    return q2y, model
+    return results.rsquared_adj, results
 
 
 def predict_categorical(
@@ -371,13 +366,54 @@ def predict_categorical(
             predicted.iloc[test_index] = model.predict(test_data)
 
     if return_proba:
-        acc = accuracy_score(labels, predicted.round())
+        acc = balanced_accuracy_score(labels, predicted.round())
     else:
-        acc = accuracy_score(labels, predicted)
+        acc = balanced_accuracy_score(labels, predicted)
 
     model.fit(data, labels)
 
     return acc, model, predicted
+
+
+def predict_clinical(
+    data: pd.Series,
+    labels: pd.Series,
+    balanced_resample: bool = True,
+):
+    """
+    Fits Logistic Regression model and hyperparameters to provided data.
+
+    Parameters:
+        data (pandas.Series): Data to predict
+        labels (pandas.Series): Labels for provided data
+        balanced_resample (bool, default:False): under-/over-samples data to
+            form balanced dataset
+
+    Returns:
+        score (float): Prediction accuracy
+    """
+    if balanced_resample:
+        oversampler = RandomOverSampler(random_state=42)
+
+    model = LogisticRegression()
+    predicted = pd.Series(index=labels.index)
+    for train_index, test_index in skf.split(data, labels):
+        train_data = data.iloc[train_index]
+        train_labels = labels.iloc[train_index]
+        test_data = data.iloc[test_index]
+
+        train_data, train_labels = oversampler.fit_resample(
+            train_data.values.reshape(-1, 1), train_labels
+        )
+
+        model.fit(train_data, train_labels)
+        predicted.iloc[test_index] = model.predict(
+            test_data.values.reshape(-1, 1)
+        )
+
+    acc = balanced_accuracy_score(labels, predicted)
+
+    return acc
 
 
 def get_probabilities(
