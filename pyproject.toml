@@ -5,19 +5,20 @@ description = ""
 authors = ["Jackson L. Chin <JacksonLymanChin@gmail.com>", "Cyrillus <cyztan@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.12,<3.13"
 numpy = "^1.23.1"
 scipy = "^1.8.1"
 tensorly = "^0.8"
-pandas = "^1.4.3"
 xarray = "^2022.6.0"
 matplotlib = "^3.5.2"
-seaborn = "^0.11.2"
 svgutils = "^0.3.4"
-tensorpack = { git = "https://github.com/meyer-lab/tensorpack.git", branch = "main" }
+tensorpack = { git = "https://github.com/meyer-lab/tensorpack.git", branch = "python_update" }
 cmtf-pls = { git = "https://github.com/meyer-lab/cmtf-pls.git", branch = "complete_missing" }
 scikit-learn = "^1.1.1"
-imbalanced-learn = "^0.11.0"
+lifelines = "^0.29.0"
+seaborn = "^0.13.2"
+imbalanced-learn = "^0.12.3"
+statsmodels = "^0.14.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

@@ -1,7 +1,7 @@
 import scipy.cluster.hierarchy as sch
 
 
-def reorder_table(df):
+def reorder_table(df, plot_ax=None):
     """
     Reorder a table's rows using hierarchical clustering.
     Parameters:
@@ -12,5 +12,10 @@ def reorder_table(df):
             clustering
     """
     y = sch.linkage(df.to_numpy(), method="centroid")
-    index = sch.dendrogram(y, orientation="right", no_plot=True)["leaves"]
+
+    if plot_ax:
+        index = sch.dendrogram(y, orientation="right", ax=plot_ax)["leaves"]
+    else:
+        index = sch.dendrogram(y, orientation="right", no_plot=True)["leaves"]
+
     return df.iloc[index, :]

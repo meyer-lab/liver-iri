@@ -7,10 +7,17 @@ import seaborn as sns
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import LabelEncoder
 
-from ..dataimport import (build_coupled_tensors, cytokine_data, lft_data,
-                          import_meta)
-from ..predict import (predict_categorical, predict_continuous,
-                       run_coupled_tpls_classification)
+from ..dataimport import (
+    build_coupled_tensors,
+    cytokine_data,
+    lft_data,
+    import_meta,
+)
+from ..predict import (
+    predict_categorical,
+    predict_continuous,
+    run_coupled_tpls_classification,
+)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 
@@ -51,9 +58,7 @@ def get_clinical_accuracies(factors, meta):
         labels = labels.astype(int)
 
         data = factors.loc[labels.index, :]
-        score, _, _ = predict_categorical(
-            data, labels
-        )
+        score, _, _ = predict_categorical(data, labels)
         accuracies.loc[target] = score
 
     for target in REGRESSION:
@@ -101,50 +106,36 @@ def makeFigure():
         accuracies.loc[rank] = _acc
 
     ax = axs[0]
-    ax.plot(
-        accuracies.index,
-        accuracies
-    )
+    ax.plot(accuracies.index, accuracies)
     ax.set_ylim([0.5, 0.75])
-    ax.set_xlabel('tPLS Components')
-    ax.set_ylabel('Prediction Accuracy')
+    ax.set_xlabel("tPLS Components")
+    ax.set_ylabel("Prediction Accuracy")
 
     ############################################################################
     # Figure 4B: Scaling heatmap
     ############################################################################
 
-    scalings = [1/8, 1/6, 1/4, 1/2, 1, 2, 4, 6, 8]
-    accuracies = pd.DataFrame(
-        index=scalings,
-        columns=scalings,
-        dtype=float
-    )
-    for pv_scaling in scalings:
-        for lft_scaling in scalings:
-            _data = build_coupled_tensors(
-                peripheral_scaling=1,
-                pv_scaling=pv_scaling,
-                lft_scaling=lft_scaling
-            )
-            _tensors, _labels = convert_to_numpy(_data, graft)
-            (_, _), _acc, _ = run_coupled_tpls_classification(
-                _tensors, _labels
-            )
-            accuracies.loc[pv_scaling, lft_scaling] = _acc
-
-    ax = axs[1]
-    sns.heatmap(
-        accuracies,
-        cmap="rocket",
-        vmin=0.5,
-        annot=True,
-        fmt=".2f",
-        ax=ax
-    )
-    ax.set_xticklabels([round(i, 3) for i in accuracies.index])
-    ax.set_yticklabels([round(i, 3) for i in accuracies.columns])
-    ax.set_xlabel("LFT Scaling")
-    ax.set_ylabel("PV Scaling")
+    # scalings = [1 / 8, 1 / 6, 1 / 4, 1 / 2, 1, 2, 4, 6, 8]
+    # accuracies = pd.DataFrame(index=scalings, columns=scalings, dtype=float)
+    # for pv_scaling in scalings:
+    #     for lft_scaling in scalings:
+    #         _data = build_coupled_tensors(
+    #             peripheral_scaling=1,
+    #             pv_scaling=pv_scaling,
+    #             lft_scaling=lft_scaling,
+    #         )
+    #         _tensors, _labels = convert_to_numpy(_data, graft)
+    #         (_, _), _acc, _ = run_coupled_tpls_classification(_tensors, _labels)
+    #         accuracies.loc[pv_scaling, lft_scaling] = _acc
+    #
+    # ax = axs[1]
+    # sns.heatmap(
+    #     accuracies, cmap="rocket", vmin=0.5, annot=True, fmt=".2f", ax=ax
+    # )
+    # ax.set_xticklabels([round(i, 3) for i in accuracies.index])
+    # ax.set_yticklabels([round(i, 3) for i in accuracies.columns])
+    # ax.set_xlabel("LFT Scaling")
+    # ax.set_ylabel("PV Scaling")
 
     ############################################################################
     # Figures 4C/4D: Bar and ROC plots
@@ -188,33 +179,20 @@ def makeFigure():
     lft_matrix = pd.concat(matrices, axis=1).dropna(axis=0)
 
     pv_acc, pv_model, pv_proba = predict_categorical(
-        pv_matrix,
-        graft.loc[pv_matrix.index],
-        return_proba=True
+        pv_matrix, graft.loc[pv_matrix.index], return_proba=True
     )
     peripheral_acc, peripheral_model, peripheral_proba = predict_categorical(
-        peripheral_matrix,
-        graft.loc[peripheral_matrix.index],
-        return_proba=True
+        peripheral_matrix, graft.loc[peripheral_matrix.index], return_proba=True
     )
     lft_acc, lft_model, lft_proba = predict_categorical(
-        lft_matrix,
-        graft.loc[lft_matrix.index],
-        return_proba=True
+        lft_matrix, graft.loc[lft_matrix.index], return_proba=True
     )
 
-    pv_fpr, pv_tpr, _ = roc_curve(
-        graft.loc[pv_matrix.index],
-        pv_proba
-    )
+    pv_fpr, pv_tpr, _ = roc_curve(graft.loc[pv_matrix.index], pv_proba)
     peripheral_fpr, peripheral_tpr, _ = roc_curve(
-        graft.loc[peripheral_matrix.index],
-        peripheral_proba
+        graft.loc[peripheral_matrix.index], peripheral_proba
     )
-    lft_fpr, lft_tpr, _ = roc_curve(
-        graft.loc[lft_matrix.index],
-        lft_proba
-    )
+    lft_fpr, lft_tpr, _ = roc_curve(graft.loc[lft_matrix.index], lft_proba)
     tpls_fpr, tpls_tpr, _ = roc_curve(labels, tpls_proba)
 
     ax = axs[2]
@@ -223,15 +201,9 @@ def makeFigure():
         [lft_acc, pv_acc, peripheral_acc, tpls_acc],
         width=1,
         color=["tab:blue", "tab:orange", "tab:green", "tab:red"],
-        label=METHODS
+        label=METHODS,
     )
-    ax.set_xticklabels(
-        METHODS,
-        ha="center",
-        ma="right",
-        va="top",
-        rotation=45
-    )
+    ax.set_xticklabels(METHODS, ha="center", ma="right", va="top", rotation=45)
     ax.legend()
     ax.set_ylim([0, 1])
 
@@ -240,22 +212,18 @@ def makeFigure():
         (lft_fpr, lft_tpr),
         (pv_fpr, pv_tpr),
         (peripheral_fpr, peripheral_tpr),
-        (tpls_fpr, tpls_tpr)
+        (tpls_fpr, tpls_tpr),
     ]
     ax.plot([0, 1], [0, 1], color="k", linestyle="--")
 
     for curve, method in zip(curves, METHODS):
-        ax.plot(
-            curve[0],
-            curve[1],
-            label=method
-        )
+        ax.plot(curve[0], curve[1], label=method)
 
     ax.legend()
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
-    ax.set_xlabel('False Positive Rate')
-    ax.set_ylabel('True Positive Rate')
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
 
     ############################################################################
     # Figures 4E/4F: Clinical Predictions
@@ -264,12 +232,9 @@ def makeFigure():
     patient_factors = pd.DataFrame(
         tpls.Xs_factors[0][0],
         index=labels.index,
-        columns=np.arange(tpls.n_components) + 1
+        columns=np.arange(tpls.n_components) + 1,
     )
-    accuracies, q2ys = get_clinical_accuracies(
-        patient_factors,
-        meta
-    )
+    accuracies, q2ys = get_clinical_accuracies(patient_factors, meta)
 
     accuracies = accuracies.sort_values(ascending=True)
     q2ys = q2ys.sort_values(ascending=True)

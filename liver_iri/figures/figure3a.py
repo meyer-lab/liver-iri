@@ -1,218 +1,200 @@
-"""Plots Figure 3 -- CP Factor Interpretation"""
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Patch
+"""Plots Figure 3a -- Resolving NK responses"""
 import numpy as np
-import seaborn as sns
-from sklearn.preprocessing import LabelEncoder
+import pandas as pd
+from scipy.stats import pearsonr
+import xarray as xr
 
-from .common import getSetup
-from ..dataimport import build_coupled_tensors, import_meta
+from .common import getSetup, plot_scatter
+from ..dataimport import build_coupled_tensors
 from ..tensor import run_coupled
-from ..utils import reorder_table
+
+COLORS = ["tab:blue", "tab:orange"]
+NK_AXIS = ["IL-2", "IL-15"]
 
 
 def makeFigure():
     ############################################################################
-    # Data imports
-    ############################################################################
-
-    meta = import_meta()
-    coupled = build_coupled_tensors(
-    )
-    coupled = coupled.sel(Patient=meta.index)
-
-    ############################################################################
     # Factorization
     ############################################################################
 
-    _, cp = run_coupled(coupled, rank=4)
-    factors = {}
-    for mode in cp.modes:
-        if 'Timepoint' not in mode:
-            factors[mode] = cp.x[f'_{mode}'].to_pandas()
+    data = build_coupled_tensors(
+        pv_scaling=1,
+        lft_scaling=1,
+        no_missing=True
+    )
+
+    _, cp = run_coupled(data, rank=4)
+    patient_factor = cp.x["_Patient"].to_pandas()
 
     ############################################################################
-    # Patient meta-data heatmap
+    # Data imports
     ############################################################################
 
-    labels = meta.loc[
-        :,
-        [
-            'liri', 'graft_death', 'etiol'
-        ]
-    ]
-    labels.loc[:, 'liri'] = labels.loc[:, 'liri'].fillna(-1)
-    labels = labels.loc[cp.x.Patient.values, :]
-
-    le = LabelEncoder()
-    labels.loc[:, 'etiology'] = le.fit_transform(labels.loc[:, 'etiol'])
-    labels = labels.sort_values(by=['graft_death', 'liri', 'etiol'])
-
-    liri_cmap = LinearSegmentedColormap.from_list(
-        'Custom',
-        ['grey', 'green', 'red'],
-        3
+    raw_data = build_coupled_tensors(
+        lft_scaling=1,
+        pv_scaling=1,
+        no_missing=True,
+        normalize=False,
+        transform="log"
     )
-    colors = [
-        'orange',
-        'yellow',
-        'greenyellow',
-        'blue',
-        'indigo',
-        'purple',
-        'violet',
-        'hotpink',
-        'pink',
-        'lightcoral'
-    ]
-    etio_cmap = LinearSegmentedColormap.from_list(
-        'Custom',
-        colors
+    raw_val = build_coupled_tensors(
+        lft_scaling=1,
+        pv_scaling=1,
+        no_missing=False,
+        normalize=False,
+        transform="log"
     )
-    graft_cmap = LinearSegmentedColormap.from_list(
-        'Custom',
-        ['darkgreen', 'darkred']
-    )
-
-    legend_elements = [
-        Patch(facecolor='darkred'),
-        Patch(facecolor='darkgreen'),
-        Patch(facecolor='white'),
-        Patch(facecolor='grey'),
-        Patch(facecolor='red'),
-        Patch(facecolor='green'),
-        Patch(facecolor='white')
-    ]
-    legend_names = [
-        'Transplant\nRejection',
-        'No Transplant\nRejection',
-        '',
-        'LIRI Unknown',
-        'High LIRI',
-        'Low LIRI',
-        '',
-    ]
-    for i in range(len(le.classes_)):
-        legend_elements.append(
-            Patch(facecolor=colors[i])
-        )
-        legend_names.append(le.classes_[i])
+    raw_data = xr.merge([raw_data, raw_val])
+    cytokine_measurements = raw_data["Cytokine Measurements"]
+    lft_measurements = raw_data["LFT Measurements"]
 
     ############################################################################
     # Figure setup
     ############################################################################
 
-    width_ratios = [
-        cp.rank * 0.9,
-        1,
-        1,
-        1,
-        cp.rank,
-        cp.rank * 0.6,
-        cp.rank,
-        cp.rank * 0.3,
-        cp.rank,
-        cp.rank * 0.25
-    ]
-
     axs, fig = getSetup(
-        (len(factors) * 3, 3),
-        {
-            'nrows': 1,
-            'ncols': len(width_ratios),
-            'width_ratios': width_ratios
-        }
+        (12, 3),
+        {"nrows": 1, "ncols": 4}
     )
 
-    spacers = [0, 1, 2, 3] + list(range(5, len(width_ratios), 2))
-    for spacer in sorted(spacers, reverse=True):
-        axs[spacer].set_frame_on(False)
-        axs[spacer].set_xticks([])
-        axs[spacer].set_yticks([])
-
     ############################################################################
-    # Meta-data heatmaps
+    # Component histograms
     ############################################################################
 
-    sns.heatmap(
-        np.expand_dims(labels.loc[:, 'etiology'].values, 1),
-        cmap=etio_cmap,
-        cbar=False,
-        ax=axs[1],
+    ax = axs[0]
+
+    ax.hist(
+        patient_factor.loc[:, 2],
+        range=(-1, 1),
+        bins=20,
+        alpha=0.75,
+        color=COLORS[0]
     )
-    sns.heatmap(
-        np.expand_dims(labels.loc[:, 'liri'].values, 1),
-        cmap=liri_cmap,
-        cbar=False,
-        ax=axs[2],
-    )
-    sns.heatmap(
-        np.expand_dims(labels.loc[:, 'graft_death'].values, 1),
-        cmap=graft_cmap,
-        cbar=False,
-        ax=axs[3],
+    ax.hist(
+        patient_factor.loc[:, 3],
+        range=(-1, 1),
+        bins=20,
+        alpha=0.75,
+        color=COLORS[1]
     )
 
-    axs[0].legend(legend_elements, legend_names, loc='center left')
-    axs[1].set_xticklabels(['Etiology'], va='top', ha='right',
-                           rotation=45)
-    axs[2].set_xticklabels(['LIRI Score'], va='top', ha='right',
-                           rotation=45)
-    axs[3].set_xticklabels(['Graft Rejection'], va='top', ha='right',
-                           rotation=45)
-    axs[1].set_yticks([])
-    axs[1].set_ylabel('')
-    axs[2].set_yticks([])
-    axs[2].set_ylabel('')
-    axs[3].set_yticks([])
-    axs[3].set_ylabel('')
+    ax.set_xlim([-1, 1])
+    ax.set_xlabel("Component Association")
+    ax.set_ylabel("Frequency")
 
     ############################################################################
-    # Factor heatmaps
+    # IL-2/IL-15 Boxplots
     ############################################################################
 
-    for ax, name in zip(axs[list(range(4, len(axs), 2))], factors.keys()):
-        data = factors[name]
+    ax = axs[1]
 
-        if name not in ['Cytokine Timepoint', 'PV Timepoint']:
-            data /= abs(data).max()
-        else:
-            data /= abs(factors['PV Timepoint']).max()
-
-        data = data.fillna(0)
-
-        if name == 'Patient':
-            data = data.loc[labels.index, :]
-        elif 'Timepoint' not in name:
-            data = reorder_table(data)
-
-        cbar = False
-        if ax == axs[-2]:
-            cbar = True
-
-        sns.heatmap(
-            data,
-            ax=ax,
-            cmap='vlag',
-            cbar=cbar,
-            vmin=-1,
-            vmax=1,
-            center=0
-        )
-        if name in ['Patient', 'Gene']:
-            ax.set_yticks([])
-            if name == 'Gene':
-                ax.set_ylabel(name)
-            else:
-                ax.set_ylabel('')
-        else:
-            ax.set_yticks(
-                np.arange(0.5, data.shape[0])
+    for bar_index, (color, cytokine) in enumerate(zip(COLORS, NK_AXIS)):
+        cytokine_df = cytokine_measurements.loc[
+            {
+                "Cytokine": cytokine
+            }
+        ].squeeze().to_pandas()
+        for index, tp in enumerate(cytokine_df.columns):
+            patch = ax.boxplot(
+                cytokine_df.loc[:, tp].dropna(),
+                patch_artist=True,
+                positions=[index * 3 + bar_index],
+                notch=True,
+                vert=True,
+                widths=0.9,
+                flierprops={
+                    "markersize": 6,
+                    "markerfacecolor": color
+                }
             )
-            ax.set_yticklabels(data.index)
-            ax.set_ylabel(name)
+            patch["boxes"][0].set_facecolor(color)
 
-        ax.set_xticks(np.arange(0.5, data.shape[1]))
-        ax.set_xlabel('Components')
+    ax.set_xticks(np.arange(0.5, 6 * 3, 3))
+    ax.set_xticklabels(cytokine_df.columns)
+
+    ax.set_xlim([-1, 3 * 6 - 1])
+    ax.set_ylabel("Cytokine Expression")
+
+    ############################################################################
+    # IL-15/Eotaxin Interaction
+    ############################################################################
+
+    ax = axs[2]
+
+    il_15 = cytokine_measurements.loc[
+        {
+            "Cytokine": "IL-15"
+        }
+    ].squeeze().to_pandas()
+    eotaxin = cytokine_measurements.loc[
+        {
+            "Cytokine": "Eotaxin"
+        }
+    ].squeeze().to_pandas()
+
+    df = pd.concat(
+        [
+            il_15.loc[:, "LF"],
+            eotaxin.loc[:, "LF"]
+        ],
+        axis=1
+    )
+    df.columns = ["LF: IL-15", "LF: Eotaxin"]
+    plot_scatter(df, ax)
+
+    ############################################################################
+    # NK/LFT Associations
+    ############################################################################
+
+    ax = axs[3]
+
+    il_15 = cytokine_measurements.loc[
+        {
+            "Cytokine": "IL-15",
+            "Cytokine Timepoint": "PV"
+        }
+    ].squeeze().to_pandas()
+
+    for lft_index, lft_score in enumerate(lft_measurements["LFT Score"].values):
+        lfts = lft_measurements.loc[
+            {
+                "LFT Score": lft_score,
+                "LFT Timepoint": ["Opening"] + [str(i) for i in range(1, 8)]
+            }
+        ].squeeze().to_pandas()
+        correlations = []
+        for lft_tp in lfts.columns:
+            df = pd.concat([il_15, lfts.loc[:, lft_tp]], axis=1)
+            df = df.dropna(axis=0)
+            result = pearsonr(
+                df.iloc[:, 0],
+                df.iloc[:, 1]
+            )
+            correlations.append(result.statistic)
+
+        ax.bar(
+            np.arange(lft_index, len(correlations) * 4, 4),
+            correlations,
+            width=1,
+            label=lft_score
+        )
+
+    x_lims = ax.get_xlim()
+    ax.plot([-100, 100], [0, 0], linestyle="--", color="k")
+    ax.set_xlim(x_lims)
+
+    ax.set_xticks(np.arange(1, lfts.shape[1] * 4, 4))
+    tick_labels = list(lfts.columns)
+    tick_labels[1:] = [f"Day {i}" for i in tick_labels[1:]]
+    ax.set_xticklabels(
+        tick_labels,
+        ha="right",
+        ma="right",
+        va="top",
+        rotation=45
+    )
+
+    ax.set_ylabel("Pearson Correlation")
+    ax.legend()
 
     return fig

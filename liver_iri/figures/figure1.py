@@ -1,62 +1,98 @@
-"""Plots Figure 1 -- CP Decomposition"""
+"""Plots Figure 1 -- Raw Data Plots"""
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn.preprocessing import LabelEncoder
 import xarray as xr
 
-from ..dataimport import cytokine_data
+from ..dataimport import build_coupled_tensors, import_meta
 from ..tensor import run_cp
 from ..utils import reorder_table
 from .common import getSetup
 
 
 def makeFigure():
-    data = cytokine_data()
-    return makeComponentPlot(data, 8, ["Patient", "Cytokine"])
+    axs, fig = getSetup(
+        (5, 2), {"ncols": 4, "nrows": 1, "width_ratios": [1, 10, 10, 10]}
+    )
 
+    data = build_coupled_tensors(
+        peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False
+    )
+    val_data = build_coupled_tensors(
+        peripheral_scaling=1,
+        pv_scaling=1,
+        lft_scaling=1,
+        normalize=False,
+        no_missing=False,
+    )
+    data = xr.merge([data, val_data])
 
-def makeComponentPlot(data: xr.DataArray, rank: int, reorder=[]):
-    cp = run_cp(data, rank)
+    meta = import_meta(long_survival=False)
+    val_meta = import_meta(long_survival=False, no_missing=False)
+    meta = pd.concat([meta, val_meta])
+    meta = meta.loc[:, ["etiol", "iri", "graft_death"]]
 
-    ddims = len(data.coords)
-    axes_names = list(data.coords)
+    le = LabelEncoder()
+    for column in meta.columns:
+        meta.loc[:, column] = le.fit_transform(meta.loc[:, column])
 
-    factors = [
-        pd.DataFrame(
-            cp[1][rr],
-            columns=[f"Cmp. {i}" for i in np.arange(1, rank + 1)],
-            index=data.coords[axes_names[rr]],
-        )
-        for rr in range(ddims)
-    ]
+    cytokines = (
+        data["Cytokine Measurements"]
+        .stack(Flattened=["Cytokine Timepoint", "Cytokine"])
+        .to_pandas()
+    )
+    lfts = (
+        data["LFT Measurements"]
+        .stack(Flattened=["LFT Timepoint", "LFT Score"])
+        .to_pandas()
+    )
 
-    for r_ax in reorder:
-        if isinstance(r_ax, int):
-            assert r_ax < ddims
-            factors[r_ax] = reorder_table(factors[r_ax])
-        elif isinstance(r_ax, str):
-            assert r_ax in axes_names
-            rr = axes_names.index(r_ax)
-            factors[rr] = reorder_table(factors[rr])
+    merged = pd.concat([cytokines, lfts], axis=1)
+    missing = np.isnan(merged)
+    merged = reorder_table(merged.fillna(-1), plot_ax=axs[1])
 
-    fig_size = (5 * ddims, 6)
-    layout = {"nrows": 1, "ncols": ddims, "wspace": 0.1}
-    axes, fig = getSetup(fig_size, layout)
-    comp_labels = [str(ii + 1) for ii in range(rank)]
+    axs[1].set_xticks([])
+    axs[1].set_yticks([])
+    axs[1].set_xlabel("")
+    axs[1].set_ylabel("")
 
-    for rr in range(ddims):
-        sns.heatmap(
-            factors[rr],
-            cmap="PiYG",
-            center=0,
-            xticklabels=comp_labels,
-            yticklabels=factors[rr].index,
-            cbar=True,
-            vmin=-1.0,
-            vmax=1.0,
-            ax=axes[rr],
-        )
-        axes[rr].set_xlabel("Components")
-        axes[rr].set_title(axes_names[rr])
+    sns.heatmap(
+        meta.loc[merged.index, :].astype(float),
+        cmap="tab10",
+        ax=axs[0],
+        cbar=False
+    )
+
+    axs[0].set_xticks([])
+    axs[0].set_yticks([])
+    axs[0].set_xlabel("")
+    axs[0].set_ylabel("")
+
+    heatmap = sns.heatmap(
+        merged.iloc[:, : cytokines.shape[1]],
+        cmap="coolwarm",
+        ax=axs[2],
+        cbar=False,
+        mask=missing.iloc[:, : cytokines.shape[1]].values,
+    )
+    heatmap.set_facecolor("lightgrey")
+
+    axs[2].set_xticks([])
+    axs[2].set_yticks([])
+    axs[2].set_xlabel("")
+
+    heatmap = sns.heatmap(
+        merged.iloc[:, cytokines.shape[1] :],
+        cmap="coolwarm",
+        ax=axs[3],
+        mask=missing.iloc[:, cytokines.shape[1] :].values,
+    )
+    heatmap.set_facecolor("lightgrey")
+
+    axs[3].set_xticks([])
+    axs[3].set_yticks([])
+    axs[3].set_xlabel("")
+    axs[3].set_ylabel("")
 
     return fig
