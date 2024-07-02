@@ -57,7 +57,12 @@ def makeFigure():
     axs[1].set_xlabel("")
     axs[1].set_ylabel("")
 
-    sns.heatmap(meta.loc[merged.index, :], cmap="tab10", ax=axs[0], cbar=False)
+    sns.heatmap(
+        meta.loc[merged.index, :].astype(float),
+        cmap="tab10",
+        ax=axs[0],
+        cbar=False
+    )
 
     axs[0].set_xticks([])
     axs[0].set_yticks([])
