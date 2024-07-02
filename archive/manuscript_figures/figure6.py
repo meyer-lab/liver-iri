@@ -1,19 +1,23 @@
-"""Plots Figure 6 -- Survival Analyses"""
+"""Plots Figure 6 -- Model Comparisons"""
 import warnings
 
 from lifelines import KaplanMeierFitter
 from lifelines.utils import concordance_index
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_curve
 from sklearn.preprocessing import scale
 import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import oversample, run_survival, run_tpls_survival
+from ..predict import (oversample, predict_categorical, run_survival,
+                       run_coupled_tpls_classification, run_tpls_survival)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
+
+METHODS = ["LFTs", "PV Cytokines", "Peripheral Cytokines", "tPLS"]
 
 
 def makeFigure():
@@ -21,8 +25,8 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    fig_size = (6, 4)
-    layout = {"nrows": 2, "ncols": 3}
+    fig_size = (6.5, 4)
+    layout = {"nrows": 2, "ncols": 4}
     axs, fig = getSetup(fig_size, layout)
 
     ############################################################################
@@ -38,21 +42,6 @@ def makeFigure():
     val_data = build_coupled_tensors(no_missing=False)
     tensors, labels = convert_to_numpy(data, labels)
     val_tensors, val_labels = convert_to_numpy(val_data, val_labels)
-
-    ############################################################################
-    # Figure 6A: Cox-PH
-    ############################################################################
-
-    (tpls, cox_ph), c_index, cph_expected = run_tpls_survival(
-        tensors, labels
-    )
-    oversampled_tensors, oversampled_labels = oversample(
-        tensors, labels, column="graft_death"
-    )
-    tpls.fit(
-        oversampled_tensors,
-        oversampled_labels.loc[:, "graft_death"].values
-    )
 
     cytokine_data = data["Cytokine Measurements"].stack(
         Flattened=["Cytokine", "Cytokine Timepoint"]
@@ -70,12 +59,98 @@ def makeFigure():
     pv_cytokines = cytokine_data.iloc[:, pv_timepoints]
     peripheral_cytokines = cytokine_data.drop(pv_cytokines.columns, axis=1)
 
+    (tpls, _), tpls_acc, tpls_proba = run_coupled_tpls_classification(
+        tensors, labels.loc[:, "graft_death"], return_proba=True
+    )
+
+    lft_data = lft_data.dropna(axis=0)
+    pv_cytokines = pv_cytokines.dropna(axis=0)
+    peripheral_cytokines = peripheral_cytokines.dropna(axis=0)
+
+    ############################################################################
+    # Figure 6A-C: Raw Data Comparisons
+    ############################################################################
+
+    pv_acc, pv_model, pv_proba = predict_categorical(
+        pv_cytokines,
+        labels.loc[pv_cytokines.index, "graft_death"],
+        return_proba=True
+    )
+    peripheral_acc, peripheral_model, peripheral_proba = predict_categorical(
+        peripheral_cytokines,
+        labels.loc[peripheral_cytokines.index, "graft_death"],
+        return_proba=True
+    )
+    lft_acc, lft_model, lft_proba = predict_categorical(
+        lft_data,
+        labels.loc[lft_data.index, "graft_death"],
+        return_proba=True
+    )
+    pv_fpr, pv_tpr, _ = roc_curve(
+        labels.loc[pv_cytokines.index, "graft_death"],
+        pv_proba
+    )
+    peripheral_fpr, peripheral_tpr, _ = roc_curve(
+        labels.loc[peripheral_cytokines.index, "graft_death"],
+        peripheral_proba
+    )
+    lft_fpr, lft_tpr, _ = roc_curve(
+        labels.loc[lft_data.index, "graft_death"],
+        lft_proba
+    )
+    tpls_fpr, tpls_tpr, _ = roc_curve(labels.loc[:, "graft_death"], tpls_proba)
+
+    ax = axs[0]
+    ax.bar(
+        np.arange(4),
+        [lft_acc, pv_acc, peripheral_acc, tpls_acc],
+        width=1,
+        color=["tab:blue", "tab:orange", "tab:green", "tab:red"],
+        label=METHODS,
+    )
+    ax.set_xticklabels(METHODS, ha="center", ma="right", va="top", rotation=45)
+    ax.legend()
+    ax.set_ylim([0, 1])
+
+    ax = axs[1]
+    curves = [
+        (lft_fpr, lft_tpr),
+        (pv_fpr, pv_tpr),
+        (peripheral_fpr, peripheral_tpr),
+        (tpls_fpr, tpls_tpr),
+    ]
+    ax.plot([0, 1], [0, 1], color="k", linestyle="--")
+
+    for curve, method in zip(curves, METHODS):
+        ax.plot(curve[0], curve[1], label=method)
+
+    ax.legend()
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+
+    ############################################################################
+    # Figure 6D-E: Cox-PH
+    ############################################################################
+
+    (tpls, cox_ph), c_index, cph_expected = run_tpls_survival(
+        tensors, labels
+    )
+    oversampled_tensors, oversampled_labels = oversample(
+        tensors, labels, column="graft_death"
+    )
+    tpls.fit(
+        oversampled_tensors,
+        oversampled_labels.loc[:, "graft_death"].values
+    )
+
     _, pv_c_index, _ = run_survival(pv_cytokines, labels)
     _, peripheral_c_index, _ = run_survival(peripheral_cytokines, labels)
     _, lft_c_index, _ = run_survival(lft_data, labels)
     _, liri_c_index, _ = run_survival(meta.loc[:, "liri"].to_frame(), labels)
 
-    ax = axs[0]
+    ax = axs[3]
 
     ax.bar(
         np.arange(5),
@@ -108,7 +183,7 @@ def makeFigure():
     ax.set_xlabel("Method")
     ax.set_ylabel("C-Index")
 
-    ax = axs[1]
+    ax = axs[4]
 
     ax.plot([0, 0], [-1, 10], linestyle="--", color="k")
     ax.errorbar(
@@ -127,7 +202,7 @@ def makeFigure():
     ax.set_ylabel("tPLS Component")
 
     ############################################################################
-    # Figures 6C-D: Kaplan-Meier Curves
+    # Figures 6F-H: Kaplan-Meier Curves
     ############################################################################
 
     merged_data = xr.merge([data, val_data])
@@ -143,7 +218,7 @@ def makeFigure():
     threshold = int(components.shape[0] / 10)
     kmf = KaplanMeierFitter()
 
-    for ax, column in zip(axs[3:], components.columns):
+    for ax, column in zip(axs[5:], components.columns):
         components = components.sort_values(by=column, ascending=False)
         high_index = components.index[:threshold]
         low_index = components.index[threshold:]
