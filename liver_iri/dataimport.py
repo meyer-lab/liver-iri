@@ -7,6 +7,7 @@ from scipy.stats import zscore
 from sklearn.preprocessing import power_transform
 
 REPO_PATH = dirname(dirname(abspath(__file__)))
+VISIT_TYPES = ["PO", "PV", "LF", "D1", "W1", "M1"]
 
 
 def transform_data(data: pd.DataFrame, transform: str = "power"):
@@ -44,6 +45,7 @@ def cytokine_data(
     peripheral_scaling: float = 1,
     pv_scaling: float = 1,
     no_missing: bool = True,
+    normalize: bool = True,
 ):
     """
     Import cytokine data into tensor form.
@@ -55,6 +57,7 @@ def cytokine_data(
         pv_scaling (float, default:1): scaling to apply to PV measurements
         no_missing (bool, default:True): return only patients with all
             measurements at all time-points
+        normalize (bool, default:True): z-score measurements
 
     Returns:
         xarray.Dataset: cytokine data in tensor form
@@ -71,7 +74,6 @@ def cytokine_data(
         )
 
     df = df.drop(["IL-3", "MIP-1a"], axis=1)
-    visit_types = df.loc[:, "visit"].unique()
 
     meta = df.loc[:, :"plate"]
     df = df.loc[:, "EGF":]
@@ -79,7 +81,7 @@ def cytokine_data(
     data = xr.DataArray(
         coords={
             "Patient": meta["PID"].unique(),
-            "Cytokine Timepoint": visit_types,
+            "Cytokine Timepoint": VISIT_TYPES,
             "Cytokine": df.columns,
         },
         dims=["Patient", "Cytokine Timepoint", "Cytokine"],
@@ -88,23 +90,24 @@ def cytokine_data(
     if transform is not None:
         df[:] = transform_data(df, transform)
 
-    df[:] = zscore(df, axis=1, nan_policy="omit")
-    df.loc[meta.loc[:, "visit"].isin(["PV", "LF"]), :] = (
-        zscore(
-            df.loc[meta.loc[:, "visit"].isin(["PV", "LF"]), :],
-            axis=0,
-            nan_policy="omit",
+    if normalize:
+        df[:] = zscore(df, axis=1, nan_policy="omit")
+        df.loc[meta.loc[:, "visit"].isin(["PV", "LF"]), :] = (
+            zscore(
+                df.loc[meta.loc[:, "visit"].isin(["PV", "LF"]), :],
+                axis=0,
+                nan_policy="omit",
+            )
+            * pv_scaling
         )
-        * pv_scaling
-    )
-    df.loc[meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"]), :] = (
-        zscore(
-            df.loc[meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"]), :],
-            axis=0,
-            nan_policy="omit",
+        df.loc[meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"]), :] = (
+            zscore(
+                df.loc[meta.loc[:, "visit"].isin(["PO", "D1", "W1", "M1"]), :],
+                axis=0,
+                nan_policy="omit",
+            )
+            * peripheral_scaling
         )
-        * peripheral_scaling
-    )
 
     for index in meta.index:
         meta_row = meta.loc[index, :]
@@ -113,7 +116,9 @@ def cytokine_data(
     return data.to_dataset(name="Cytokine Measurements")
 
 
-def lft_data(transform: str = "power", no_missing: bool = True):
+def lft_data(
+    transform: str = "power", no_missing: bool = True, normalize: bool = True
+):
     """
     Import LFT data into tensor form.
 
@@ -121,6 +126,7 @@ def lft_data(transform: str = "power", no_missing: bool = True):
         transform (str, default:'power'): specifies transformation to use
         no_missing (bool, default:True): return only patients with all
             measurements at all time-points
+        normalize (bool, default:True): z-score measurements
 
     Returns:
         xarray.Dataset: RNA expression data in tensor form
@@ -146,7 +152,9 @@ def lft_data(transform: str = "power", no_missing: bool = True):
     scores = ["ast", "alt", "tbil"]
 
     patients = lfts.index.values
-    lfts[:] = zscore(lfts, nan_policy="omit", axis=0)
+    if normalize:
+        lfts[:] = zscore(lfts, nan_policy="omit", axis=1)
+        lfts[:] = zscore(lfts, nan_policy="omit", axis=0)
 
     data = xr.DataArray(
         coords={
@@ -166,20 +174,24 @@ def lft_data(transform: str = "power", no_missing: bool = True):
 
 
 def build_coupled_tensors(
+    transform: str = "power",
     peripheral_scaling: float = 1,
-    pv_scaling: float = 0.25,
-    lft_scaling: float = 1 / 6,
+    pv_scaling: float = 0.1,
+    lft_scaling: float = 0.1,
     no_missing: bool = True,
+    normalize: bool = True,
 ):
     """
     Builds datasets and couples across shared patient dimension.
 
     Parameters:
+        transform (str, default:'power'): specifies transformation to use
         peripheral_scaling (float, default: 1): peripheral cytokine scaling
         pv_scaling (float, default: 1): PV cytokine scaling
         lft_scaling (float, default: 1): LFT scaling
         no_missing (bool, default:True): return only patients with all
             measurements at all time-points
+        normalize (bool, default:True): z-score measurements
 
     Returns:
         xr.Dataset: coupled datasets merged into one object
@@ -189,13 +201,15 @@ def build_coupled_tensors(
             peripheral_scaling=peripheral_scaling,
             pv_scaling=pv_scaling,
             no_missing=no_missing,
+            normalize=normalize,
+            transform=transform,
         ),
-        lft_data(no_missing=no_missing) * lft_scaling,
+        lft_data(
+            no_missing=no_missing, normalize=normalize, transform=transform
+        )
+        * lft_scaling,
     ]
     coupled = xr.merge(tensors)
-
-    if no_missing:
-        coupled = coupled.drop_sel(Patient=90)
 
     return coupled
 
@@ -219,7 +233,6 @@ def import_meta(long_survival: bool = True, no_missing: bool = True):
             index_col=0,
         )
         data.index = data.index.astype(int)
-        data = data.drop(90)
     else:
         data = pd.read_csv(
             join(REPO_PATH, "liver_iri", "data", "patient_meta_validation.csv"),
