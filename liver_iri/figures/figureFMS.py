@@ -60,8 +60,8 @@ def makeFigure():
             _, resampled_cp = run_coupled(resampled_data, rank=rank)
             lft_resampled = resampled_cp.to_CPTensor(dvar="LFT Measurements")
             cyto_resampled = resampled_cp.to_CPTensor(dvar="Cytokine Measurements")
-            lft_score = fms(lft_cp, lft_resampled, consider_weights=True)
-            cyto_score = fms(cyto_cp, cyto_resampled, consider_weights=True)
+            lft_score = fms(lft_cp, lft_resampled, consider_weights=False)
+            cyto_score = fms(cyto_cp, cyto_resampled, consider_weights=False)
 
             lft_scores.loc[trial, rank] = lft_score
             cyto_scores.loc[trial, rank] = cyto_score

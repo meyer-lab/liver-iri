@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .PHONY: clean test
 
-flist = $(filter-out pf2/figures/figure4.py, $(wildcard liver_iri/figures/figure*.py))
+flist = $(filter-out liver_iri/figures/figure4.py, $(wildcard liver_iri/figures/figure*.py))
 allOutput = $(patsubst liver_iri/figures/figure%.py, output/figure%.svg, $(flist))
 
 all: $(allOutput)

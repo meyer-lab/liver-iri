@@ -1350,7 +1350,7 @@ xarray = ">=2022.6.0"
 type = "git"
 url = "https://github.com/meyer-lab/tensorpack.git"
 reference = "python_update"
-resolved_reference = "293958287ee5ff73ae0463e71244fb27cbf7f81c"
+resolved_reference = "770fca9bb00b31cb3b0bab94b2051fc59890b63b"
 
 [[package]]
 name = "threadpoolctl"
