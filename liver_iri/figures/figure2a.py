@@ -17,16 +17,14 @@ def makeFigure():
     # Data import & factorization
     ############################################################################
 
-    meta = import_meta()
-    val_meta = import_meta(long_survival=False, no_missing=False)
-    meta = pd.concat([meta, val_meta])
+    meta = import_meta(long_survival=False, no_missing=True)
     data = build_coupled_tensors(
         pv_scaling=1,
         lft_scaling=1,
         no_missing=True
     )
 
-    _, cp = run_coupled(data, rank=4)
+    _, cp = run_coupled(data)
     factors = {}
     for mode in cp.modes:
         if "Timepoint" not in mode:
