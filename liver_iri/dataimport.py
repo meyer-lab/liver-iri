@@ -7,6 +7,7 @@ from scipy.stats import zscore
 from sklearn.preprocessing import power_transform
 
 REPO_PATH = dirname(dirname(abspath(__file__)))
+VISIT_TYPES = ["PO", "PV", "LF", "D1", "W1", "M1"]
 
 
 def transform_data(data: pd.DataFrame, transform: str = "power"):
@@ -73,7 +74,6 @@ def cytokine_data(
         )
 
     df = df.drop(["IL-3", "MIP-1a"], axis=1)
-    visit_types = df.loc[:, "visit"].unique()
 
     meta = df.loc[:, :"plate"]
     df = df.loc[:, "EGF":]
@@ -81,7 +81,7 @@ def cytokine_data(
     data = xr.DataArray(
         coords={
             "Patient": meta["PID"].unique(),
-            "Cytokine Timepoint": visit_types,
+            "Cytokine Timepoint": VISIT_TYPES,
             "Cytokine": df.columns,
         },
         dims=["Patient", "Cytokine Timepoint", "Cytokine"],
@@ -153,6 +153,7 @@ def lft_data(
 
     patients = lfts.index.values
     if normalize:
+        lfts[:] = zscore(lfts, nan_policy="omit", axis=1)
         lfts[:] = zscore(lfts, nan_policy="omit", axis=0)
 
     data = xr.DataArray(
@@ -210,9 +211,6 @@ def build_coupled_tensors(
     ]
     coupled = xr.merge(tensors)
 
-    if no_missing:
-        coupled = coupled.drop_sel(Patient=90)
-
     return coupled
 
 
@@ -235,7 +233,6 @@ def import_meta(long_survival: bool = True, no_missing: bool = True):
             index_col=0,
         )
         data.index = data.index.astype(int)
-        data = data.drop(90)
     else:
         data = pd.read_csv(
             join(REPO_PATH, "liver_iri", "data", "patient_meta_validation.csv"),
