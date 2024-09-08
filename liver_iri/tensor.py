@@ -55,7 +55,7 @@ def run_cp(data, rank=OPTIMAL_RANK):
     return cp
 
 
-def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
+def run_coupled(data=None, rank=OPTIMAL_RANK):
     """
     Runs coupled CP and returns factor matrices.
 
@@ -64,7 +64,6 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
             'None', builds default coupled tensor (see
             dataimport.build_coupled_tensor)
         rank (int, default: OPTIMAL_RANK): tensor factorization rank
-        nonneg (bool, default: False): runs non-negative factorization
 
     Returns:
         factors (pd.DataFrame): patient factors for provided data
@@ -76,14 +75,10 @@ def run_coupled(data=None, rank=OPTIMAL_RANK, nonneg=False):
     if data is None:
         data = build_coupled_tensors()
 
-    if nonneg:
-        decomposer = CoupledTensor(data, rank)
-        decomposer.initialize(method="svd")
-    else:
-        decomposer = CoupledTensor(data, rank)
-        decomposer.initialize(method="randomized_svd")
+    decomposer = CoupledTensor(data, rank)
+    decomposer.initialize(method="randomized_svd")
 
-    decomposer.fit(nonneg=nonneg, tol=1e-6, maxiter=2500, progress=False)
+    decomposer.fit(tol=1e-6, maxiter=200, progress=False)
     decomposer.normalize_factors()
     factors = decomposer.x._Patient.to_pandas()
 
