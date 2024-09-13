@@ -8,7 +8,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
-      run: poetry install
+      uses: eifinger/setup-rye@v4
+      with:
+        enable-cache: true
+        version: '0.39.0'
     - name: Build figures
       run: make all -j 4
     - name: Upload files

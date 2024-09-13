@@ -15,7 +15,9 @@ jobs:
     runs-on: self-hosted
     steps:
     - name: Install dependencies
-      run: poetry install --no-root
+      uses: eifinger/setup-rye@v4
+      with:
+        enable-cache: true
+        version: '0.39.0'
     - name: Test with pytest
       run: make test
-      
