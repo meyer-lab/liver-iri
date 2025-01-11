@@ -175,9 +175,9 @@ def lft_data(
 
 def build_coupled_tensors(
     transform: str = "power",
-    peripheral_scaling: float = 1,
-    pv_scaling: float = 0.25,
-    lft_scaling: float = 1 / 6,
+    peripheral_scaling: float = 1E2,
+    pv_scaling: float = 1,
+    lft_scaling: float = 1,
     no_missing: bool = True,
     normalize: bool = True,
 ):

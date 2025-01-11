@@ -239,13 +239,17 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
         labels.loc[:, "graft_death"],
         labels.loc[:, "graft_death"]
     ):
-        train_data = data.iloc[train_index, :]
-        test_data = data.iloc[test_index, :]
-        train_labels = labels.iloc[train_index, :]
+        train_data = data.iloc[train_index]
+        test_data = data.iloc[test_index]
+        train_labels = labels.iloc[train_index]
+
+        if isinstance(train_data, pd.Series):
+            train_data = train_data.to_frame()
+            test_data = test_data.to_frame()
 
         oversampler.fit_resample(train_data, train_labels.loc[:, "graft_death"])
-        train_data = train_data.iloc[oversampler.sample_indices_, :]
-        train_labels = train_labels.iloc[oversampler.sample_indices_, :]
+        train_data = train_data.iloc[oversampler.sample_indices_]
+        train_labels = train_labels.iloc[oversampler.sample_indices_]
         train_data = pd.concat([train_data, train_labels], axis=1)
         model.fit(
             train_data,
@@ -379,6 +383,7 @@ def predict_clinical(
     data: pd.Series,
     labels: pd.Series,
     balanced_resample: bool = True,
+    return_proba: bool = False
 ):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
@@ -407,13 +412,21 @@ def predict_clinical(
         )
 
         model.fit(train_data, train_labels)
-        predicted.iloc[test_index] = model.predict(
-            test_data.values.reshape(-1, 1)
-        )
 
-    acc = balanced_accuracy_score(labels, predicted)
+        if return_proba:
+            predicted.iloc[test_index] = model.predict_proba(
+                test_data.values.reshape(-1, 1)
+            )[:, 1]
+        else:
+            predicted.iloc[test_index] = model.predict(
+                test_data.values.reshape(-1, 1)
+            )
 
-    return acc
+    if return_proba:
+        return predicted
+    else:
+        acc = balanced_accuracy_score(labels, predicted)
+        return acc
 
 
 def get_probabilities(
