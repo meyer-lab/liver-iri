@@ -1,4 +1,4 @@
-"""Plots Figure 1fg,jk -- Cytokine Binned Clinical Comparisons"""
+"""Plots Figure 1b-- Cytokine Binary Clinical Comparisons"""
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
@@ -10,7 +10,7 @@ from ..dataimport import build_coupled_tensors, import_meta
 
 
 DIFFERENCES = [
-    "bnscores", "postinf", "postnec", "poststeat", "postcong", "postbal"
+    "etoh", "hcv", "nash",  "hcc", "psens", "esens", "lsens", "iri"
 ]
 
 
@@ -56,7 +56,6 @@ def makeFigure():
         for to_diff in DIFFERENCES:
             ax = axs[ax_index]
             meta_col = meta.loc[:, to_diff].dropna()
-            meta_col = meta_col > 1
             meta_col[:] = le.fit_transform(meta_col)
             _df = df.loc[meta_col.index, :]
 
