@@ -1,4 +1,4 @@
-"""Plots Figure 1 -- Raw Data Plots"""
+"""Plots Figure 1c -- Raw Data Heatmaps"""
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -6,16 +6,17 @@ from sklearn.preprocessing import LabelEncoder
 import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..tensor import run_cp
 from ..utils import reorder_table
 from .common import getSetup
 
 
 def makeFigure():
+    # Figure setup
     axs, fig = getSetup(
         (5, 2), {"ncols": 4, "nrows": 1, "width_ratios": [1, 10, 10, 10]}
     )
 
+    # Data imports
     data = build_coupled_tensors(
         peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False
     )
@@ -57,6 +58,7 @@ def makeFigure():
     axs[1].set_xlabel("")
     axs[1].set_ylabel("")
 
+    # Transplant subset colorbars
     sns.heatmap(
         meta.loc[merged.index, :].astype(float),
         cmap="tab10",
@@ -69,8 +71,9 @@ def makeFigure():
     axs[0].set_xlabel("")
     axs[0].set_ylabel("")
 
+    # Cytokines
     heatmap = sns.heatmap(
-        merged.iloc[:, : cytokines.shape[1]],
+        merged.iloc[:, :cytokines.shape[1]],
         cmap="coolwarm",
         ax=axs[2],
         cbar=False,
@@ -82,11 +85,12 @@ def makeFigure():
     axs[2].set_yticks([])
     axs[2].set_xlabel("")
 
+    # LFTs
     heatmap = sns.heatmap(
-        merged.iloc[:, cytokines.shape[1] :],
+        merged.iloc[:, cytokines.shape[1]:],
         cmap="coolwarm",
         ax=axs[3],
-        mask=missing.iloc[:, cytokines.shape[1] :].values,
+        mask=missing.iloc[:, cytokines.shape[1]:].values,
     )
     heatmap.set_facecolor("lightgrey")
 
