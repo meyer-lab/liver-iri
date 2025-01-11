@@ -1,4 +1,4 @@
-"""Plots Figure 2a -- CP Factorization"""
+"""Plots Figure 2a -- CTF Factor Matrices"""
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Patch
 import numpy as np
@@ -19,6 +19,7 @@ def makeFigure():
 
     meta = import_meta(long_survival=False, no_missing=True)
     data = build_coupled_tensors(
+        peripheral_scaling=1,
         pv_scaling=1,
         lft_scaling=1,
         no_missing=True

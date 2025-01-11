@@ -1,4 +1,4 @@
-"""Plots Figure 2b -- CP Factorization Timepoint Associations"""
+"""Plots Figure 2b -- CTF Factorization Timepoints"""
 import numpy as np
 import xarray as xr
 
@@ -13,6 +13,7 @@ def makeFigure():
     ############################################################################
 
     data = build_coupled_tensors(
+        peripheral_scaling=1,
         pv_scaling=1,
         lft_scaling=1,
         no_missing=True
