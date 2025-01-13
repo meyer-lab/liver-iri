@@ -1,64 +1,18 @@
-"""Plots Figure 2e -- Resolving Cytokine Response"""
-from decimal import Decimal
+"""Plots Figure 6bc-- tPLS 2 Heatmap"""
 import warnings
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import predict_continuous
+from ..predict import oversample, run_coupled_tpls_classification
 from ..tensor import convert_to_numpy
 from ..utils import reorder_table
 from .common import getSetup
 
-GRANULOCYTE_CYTOKINES = ["IL-17A", "IFNg", "IL-12P70"]
-
 warnings.filterwarnings("ignore")
-
-
-def plot_scatter(cytokine_measurements, cytokine, timepoints, ax):
-    df = cytokine_measurements.loc[{
-        "Cytokine": cytokine,
-        "Cytokine Timepoint": timepoints
-    }].to_pandas()
-    df = df.loc[
-        df.iloc[:, 0] >= 2,
-        :
-    ]
-    df = df.dropna(axis=0)
-    score, model = predict_continuous(
-        df.iloc[:, 0],
-        df.iloc[:, 1]
-    )
-
-    xs = [2, df.iloc[:, 0].max() * 1.05]
-    ys = [
-        model.params.iloc[0] + model.params.iloc[1] * xs[0],
-        model.params.iloc[0] + model.params.iloc[1] * xs[1]
-    ]
-    ax.plot(xs, ys, color="k", linestyle="--")
-
-    ax.scatter(
-        df.iloc[:, 0],
-        df.iloc[:, 1],
-        s=6
-    )
-    ax.set_xlabel(df.columns[0])
-    ax.set_ylabel(df.columns[1])
-
-    ax.text(
-        0.98,
-        0.02,
-        s=f"R2: {round(score, 3)}\np-value: {Decimal(model.pvalues[1]):.2E}",
-        ha="right",
-        ma="right",
-        va="bottom",
-        transform=ax.transAxes
-    )
-    ax.set_xlim([2, xs[1]])
-    ax.set_ylim([0, ax.get_ylim()[-1]])
-    ax.set_title(cytokine)
 
 
 def makeFigure():
@@ -66,29 +20,91 @@ def makeFigure():
     # Data imports
     ############################################################################
 
+    meta = import_meta()
+    labels = meta.loc[:, "graft_death"]
+    labels = labels.dropna()
+
+    val_meta = import_meta(no_missing=False)
+    val_labels = val_meta.loc[:, "graft_death"]
+    val_labels = val_labels.dropna()
+
+    data = build_coupled_tensors()
+    val_data = build_coupled_tensors(no_missing=False)
+
+    all_data = xr.merge([data, val_data])
+    all_labels = pd.concat([labels, val_labels])
+    all_tensors, all_labels = convert_to_numpy(all_data, all_labels)
+
     raw_data = build_coupled_tensors(
         lft_scaling=1,
         pv_scaling=1,
-        no_missing=True,
-        normalize=False,
-        transform="log"
+        transform="log",
+        normalize=False
     )
     raw_val = build_coupled_tensors(
+        no_missing=False,
         lft_scaling=1,
         pv_scaling=1,
-        no_missing=False,
-        normalize=False,
-        transform="log"
+        transform="log",
+        normalize=False
     )
     raw_data = xr.merge([raw_data, raw_val])
+
     cytokine_measurements = raw_data["Cytokine Measurements"]
 
-    axs, fig = getSetup(
-        (9, 3),
-        {"nrows": 1, "ncols": 3}
-    )
+    tensors, labels = convert_to_numpy(data, labels)
+    oversampled_tensors, oversampled_labels = oversample(tensors, labels)
 
-    for ax, cytokine in zip(axs, GRANULOCYTE_CYTOKINES):
-        plot_scatter(cytokine_measurements, cytokine, ["PV", "W1"], ax)
+    (tpls, lr_model), tpls_acc, tpls_proba = run_coupled_tpls_classification(
+        tensors, labels, return_proba=True
+    )
+    tpls.fit(oversampled_tensors, oversampled_labels.values)
+
+    ############################################################################
+    # tPLS Patients
+    ############################################################################
+
+    factor = tpls.transform(all_tensors)
+    patient_factors = pd.DataFrame(
+        factor,
+        index=all_labels.index,
+        columns=np.arange(1, factor.shape[1] + 1),
+    )
+    patient_factors = patient_factors.loc[all_labels.index, :]
+    patient_factors /= abs(patient_factors).max(axis=0)
+
+    patient_factors = patient_factors.sort_values(2, ascending=False)
+    high_2, low_2 = patient_factors.index[:30], patient_factors.index[-30:]
+
+    axs, fig = getSetup(
+        (6, 3),
+        {"ncols": 1, "nrows": 1}
+    )
+    ax = axs[0]
+
+    high_mean = cytokine_measurements.sel(
+        {
+            "Patient": high_2,
+        }
+    ).mean("Patient").to_pandas()
+    low_mean = cytokine_measurements.sel(
+        {
+            "Patient": low_2,
+        }
+    ).mean("Patient").to_pandas()
+    diff = high_mean - low_mean
+    diff = reorder_table(diff.T).T
+
+    sns.heatmap(
+        diff,
+        center=0,
+        ax=ax,
+        cmap="coolwarm",
+        square=True,
+        linewidths=0.1
+    )
+    ax.set_yticklabels(diff.index)
+    ax.set_xticks(np.arange(0.5, diff.shape[1]))
+    ax.set_xticklabels(diff.columns, rotation=90)
 
     return fig
