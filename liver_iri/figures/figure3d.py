@@ -1,6 +1,4 @@
-"""Plots Figure 3b -- CTF 2: IFNg & VEGF"""
-import numpy as np
-from scipy.stats import pearsonr
+"""Plots Figure 3d -- CTF 4: Returning GRO, Flt-3L"""
 import xarray as xr
 
 from .common import getSetup, plot_scatter
@@ -34,50 +32,51 @@ def makeFigure():
     ############################################################################
 
     axs, fig = getSetup(
-        (6, 3),
-        {"nrows": 1, "ncols": 2}
+        (12, 3),
+        {"nrows": 1, "ncols": 4}
     )
 
     ############################################################################
-    # IFN-gamma interactions
+    # Component Histogram
     ############################################################################
 
     ax = axs[0]
-    correlations = []
-    for tp in cytokine_measurements["Cytokine Timepoint"].values:
-        ifng = cytokine_measurements.loc[
-            {
-                "Cytokine": "IFNg",
-                "Cytokine Timepoint": tp
-            }
-        ].squeeze().to_pandas().dropna()
-        vegf = cytokine_measurements.loc[
-            {
-                "Cytokine": ["VEGF"],
-                "Cytokine Timepoint": tp
-            }
-        ].squeeze().to_pandas().dropna()
-        result = pearsonr(ifng, vegf)
-        correlations.append(result.statistic)
 
-    ax.bar(
-        np.arange(len(correlations)),
-        correlations
+    gro = cytokine_measurements.loc[{"Cytokine": "GRO"}].squeeze().to_pandas()
+    flt3l = cytokine_measurements.loc[{
+        "Cytokine": "Flt-3L"
+    }].squeeze().to_pandas()
+
+    df = gro.loc[:, ["LF", "M1"]]
+    df.columns = "GRO: " + df.columns
+    plot_scatter(
+        df,
+        ax
     )
 
     ax = axs[1]
 
-    ifng_vegf = cytokine_measurements.loc[
-        {
-            "Cytokine": ["IFNg", "VEGF"],
-            "Cytokine Timepoint": "D1"
-        }
-    ].squeeze().to_pandas().dropna()
-    ifng_vegf.columns = "D1: " + ifng_vegf.columns
-
+    df = flt3l.loc[:, ["LF", "M1"]]
+    df.columns = "Flt-3L: " + df.columns
     plot_scatter(
-        ifng_vegf,
+        df,
         ax
     )
+
+    for ax, df, name in zip(axs[2:], [flt3l, gro], ["Flt-3L", "GRO"]):
+        for index, tp in enumerate(df.columns):
+            ax.boxplot(
+                df.loc[:, tp].dropna(),
+                patch_artist=True,
+                positions=[index * 2],
+                notch=True,
+                vert=True,
+                widths=0.9,
+                flierprops={
+                    "markersize": 6,
+                }
+            )
+        ax.set_title(name)
+        ax.set_xlim([-1, 11])
 
     return fig
