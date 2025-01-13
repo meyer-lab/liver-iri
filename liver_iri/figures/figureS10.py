@@ -1,4 +1,4 @@
-"""Plots Figure 1j -- All Cytokine Errorbars"""
+"""Plots Figure S10 -- All Cytokine Errorbars"""
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind, pearsonr
@@ -11,14 +11,6 @@ from ..dataimport import build_coupled_tensors, import_meta
 
 
 def makeFigure():
-    ############################################################################
-    # Factorization
-    ############################################################################
-
-    meta = import_meta(long_survival=False)
-    val_meta = import_meta(no_missing=False, long_survival=False)
-    meta = pd.concat([meta, val_meta])
-
     data = build_coupled_tensors(
         peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False,
         transform="log"
@@ -42,12 +34,7 @@ def makeFigure():
         }
     )
 
-    ############################################################################
-    # Correlation
-    ############################################################################
-
     ax_index = 0
-    le = LabelEncoder()
     for cytokine, ax in zip(cytokines["Cytokine"].values, axs):
         df = cytokines.sel(
             {

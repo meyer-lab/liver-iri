@@ -1,6 +1,7 @@
-"""Plots Figure 3S -- FMS"""
+"""Plots Figure S3 -- FMS Tuning"""
 import numpy as np
 import pandas as pd
+from statsmodels.multivariate.pca import PCA
 from tlviz.factor_tools import factor_match_score as fms
 from tqdm import tqdm
 import xarray as xr
@@ -42,7 +43,7 @@ def makeFigure():
 
     axs, fig = getSetup(
         (8, 4),
-        {"nrows": 1, "ncols": 2}
+        {"nrows": 1, "ncols": 3}
     )
 
     lft_scores = pd.DataFrame(
@@ -51,17 +52,40 @@ def makeFigure():
         dtype=float
     )
     cyto_scores = lft_scores.copy(deep=True)
+    r2xs = pd.DataFrame(
+        index=["CTF"],
+        columns=np.arange(RANKS) + 1,
+        dtype=float
+    )
+
     for rank in tqdm(np.arange(RANKS) + 1):
         _, cp = run_coupled(data, rank=rank)
         lft_cp = cp.to_CPTensor(dvar="LFT Measurements")
         cyto_cp = cp.to_CPTensor(dvar="Cytokine Measurements")
+
+        r2xs.loc["CTF", rank] = cp.R2X()
+
         for trial in np.arange(N_TRIALS) + 1:
             resampled_data = resample(data)
             _, resampled_cp = run_coupled(resampled_data, rank=rank)
-            lft_resampled = resampled_cp.to_CPTensor(dvar="LFT Measurements")
-            cyto_resampled = resampled_cp.to_CPTensor(dvar="Cytokine Measurements")
-            lft_score = fms(lft_cp, lft_resampled, consider_weights=False, skip_mode=0)
-            cyto_score = fms(cyto_cp, cyto_resampled, consider_weights=False, skip_mode=0)
+            lft_resampled = resampled_cp.to_CPTensor(
+                dvar="LFT Measurements"
+            )
+            cyto_resampled = resampled_cp.to_CPTensor(
+                dvar="Cytokine Measurements"
+            )
+            lft_score = fms(
+                lft_cp,
+                lft_resampled,
+                consider_weights=False,
+                skip_mode=0
+            )
+            cyto_score = fms(
+                cyto_cp,
+                cyto_resampled,
+                consider_weights=False,
+                skip_mode=0
+            )
 
             lft_scores.loc[trial, rank] = lft_score
             cyto_scores.loc[trial, rank] = cyto_score
@@ -79,13 +103,44 @@ def makeFigure():
             mean.index,
             mean
         )
+        ax.set_xticks(np.arange(1, 6, 1))
+        ax.set_yticks(np.arange(0, 1.25, 0.25))
+        ax.set_ylim([0, 1])
         ax.set_xlabel("Rank")
         ax.set_ylabel("FMS")
 
     axs[0].set_title("LFTs")
     axs[1].set_title("Cytokines")
 
-    lft_scores.to_csv("lft_fms.csv")
-    cyto_scores.to_csv("cyto_fms.csv")
+    ############################################################################
+    # R2X Plots
+    ############################################################################
+
+    flattened = data["Cytokine Measurements"].stack(
+        merged=("Cytokine", "Cytokine Timepoint")
+    ).to_pandas()
+    flattened = pd.concat([
+        flattened,
+        data["LFT Measurements"].stack(
+            merged=("LFT Score", "LFT Timepoint")
+        ).to_pandas()],
+        axis=1
+    )
+
+    pca = PCA(flattened, missing="fill-em", ncomp=5)
+    r2xs.loc["PCA", :] = pca.rsquare.iloc[1:].values
+    ax = axs[2]
+    for line in r2xs.index:
+        ax.plot(
+            np.arange(r2xs.shape[1]) + 1,
+            r2xs.loc[line, :],
+            label=line
+        )
+
+    ax.set_xticks(np.arange(1, 6, 1))
+    ax.set_yticks(np.arange(0, 0.6, 0.1))
+    ax.set_xlabel("Rank")
+    ax.set_ylabel("R2X")
+    ax.legend()
 
     return fig
