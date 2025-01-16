@@ -24,9 +24,9 @@ skf = StratifiedKFold(n_splits=20)
 
 
 def oversample(
-        tensors: list[np.ndarray],
-        labels: pd.Series,
-        column: Union[str, None] = None
+    tensors: list[np.ndarray],
+    labels: pd.Series,
+    column: Union[str, None] = None
 ):
     """
     Over-/under-samples tensor data to form balanced dataset.
@@ -57,11 +57,11 @@ def oversample(
 
 
 def run_coupled_tpls_classification(
-        tensors: list[np.ndarray],
-        labels: pd.Series,
-        rank: int = OPTIMAL_TPLS,
-        return_proba: bool = False,
-        return_components: bool = False,
+    tensors: list[np.ndarray],
+    labels: pd.Series,
+    rank: int = OPTIMAL_TPLS,
+    return_proba: bool = False,
+    return_components: bool = False,
 ):
     """
     Fits coupled tPLS model to provided data and labels.
@@ -152,9 +152,9 @@ def run_coupled_tpls_classification(
 
 
 def run_tpls_survival(
-        tensors: list[np.ndarray],
-        labels: pd.DataFrame,
-        rank: int = OPTIMAL_TPLS
+    tensors: list[np.ndarray],
+    labels: pd.DataFrame,
+    rank: int = OPTIMAL_TPLS
 ):
     """
     Runs survival regression via coupled tPLS.
@@ -266,8 +266,8 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
 
 
 def predict_continuous(
-        data: Union[xr.Dataset, pd.DataFrame],
-        labels: pd.Series
+    data: Union[xr.Dataset, pd.DataFrame],
+    labels: pd.Series
 ):
     """
     Fits Elastic Net model and hyperparameters to provided data.
@@ -292,10 +292,10 @@ def predict_continuous(
 
 
 def predict_categorical(
-        data: pd.DataFrame,
-        labels: pd.Series,
-        return_proba: bool = False,
-        balanced_resample: bool = True,
+    data: pd.DataFrame,
+    labels: pd.Series,
+    return_proba: bool = False,
+    balanced_resample: bool = True,
 ):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
@@ -373,9 +373,9 @@ def predict_categorical(
 
 
 def predict_clinical(
-        data: pd.Series,
-        labels: pd.Series,
-        balanced_resample: bool = True,
+    data: pd.Series,
+    labels: pd.Series,
+    balanced_resample: bool = True,
 ):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
@@ -397,9 +397,10 @@ def predict_clinical(
         train_labels = labels.iloc[train_index]
         test_data = data.iloc[test_index]
 
-        train_data, train_labels = oversampler.fit_resample(  # type: ignore
-            train_data.to_numpy().reshape(-1, 1), train_labels
-        )
+        if balanced_resample:
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore
+                train_data.to_numpy().reshape(-1, 1), train_labels
+            )
 
         model.fit(train_data, train_labels)
         predicted.iloc[test_index] = model.predict(
