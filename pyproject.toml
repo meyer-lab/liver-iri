@@ -1,36 +1,68 @@
-[tool.poetry]
+[project]
 name = "liver-iri"
 version = "0.1.0"
-description = ""
-authors = ["Jackson L. Chin <JacksonLymanChin@gmail.com>", "Cyrillus <cyztan@gmail.com>"]
-
-[tool.poetry.dependencies]
-python = ">=3.12,<3.13"
-numpy = "^1.23.1"
-scipy = "^1.8.1"
-tensorly = "^0.8"
-xarray = ">=2022.6.0"
-matplotlib = "^3.5.2"
-svgutils = "^0.3.4"
-tensorpack = { git = "https://github.com/meyer-lab/tensorpack.git" }
-cmtf-pls = { git = "https://github.com/meyer-lab/cmtf-pls.git" }
-scikit-learn = "^1.1.1"
-lifelines = "^0.29.0"
-seaborn = "^0.13.2"
-imbalanced-learn = "^0.12.3"
-statsmodels = "^0.14.2"
-tlviz = "^0.1.1"
-tensorly-viz = "^0.1.7"
-
-[tool.poetry.dev-dependencies]
-pytest = "^7.1.2"
+description = "Tensor-based integration of Liver Ischemia Reperfusion Injury Mechanisms"
+authors = [
+    { name = "Jackson L. Chin", email = "jch1n@g.ucla.edu" },
+    { name = "Cyrillus Z. Tan", email = "cyztan@gmail.com" }
+]
+dependencies = [
+    "numpy>=1.23.1",
+    "scipy>=1.8.1",
+    "tensorly>=0.8",
+    "xarray>=2022.6.0",
+    "matplotlib>=3.5.2",
+    "svgutils>=0.3.4",
+    "scikit-learn>=1.5.2",
+    "lifelines>=0.29.0",
+    "seaborn>=0.13.2",
+    "imbalanced-learn>=0.12.3",
+    "statsmodels>=0.14.2",
+    "tensorly-viz>=0.1.7",
+    "tensorpack @ git+https://github.com/meyer-lab/tensorpack.git",
+    "cmtf-pls @ git+https://github.com/meyer-lab/cmtf-pls.git",
+]
+readme = "README.md"
+requires-python = ">= 3.12"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry.scripts]
-fbuild = "liver_iri.figures.common:genFigure"
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pyright>=1.1",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["liver_iri"]
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # Unused arguments
+    "ARG",
+]
 
 [tool.black]
 line-length = 80
+
+[project.scripts]
+fbuild = "liver_iri.figures.common:genFigure"

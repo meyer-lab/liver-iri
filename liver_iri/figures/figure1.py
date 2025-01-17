@@ -6,7 +6,6 @@ from sklearn.preprocessing import LabelEncoder
 import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..tensor import run_cp
 from ..utils import reorder_table
 from .common import getSetup
 

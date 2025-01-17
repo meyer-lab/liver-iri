@@ -1,19 +1,19 @@
 """
 This file contains functions that are used in multiple figures.
 """
+
 from decimal import Decimal
+from typing import Any, Dict, Iterable, Tuple, Union
 
 import logging
 import sys
 import time
-from string import ascii_lowercase
 
 from matplotlib.axes import Axes
 import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import svgutils.transform as st
 from matplotlib import gridspec
 from matplotlib import pyplot as plt
 
@@ -44,10 +44,16 @@ matplotlib.rcParams["ytick.major.pad"] = 1.0
 matplotlib.rcParams["ytick.minor.pad"] = 0.9
 
 
-def getSetup(figsize, gridd, multz=None, empts=None, style="whitegrid"):
+def getSetup(
+    figsize: Tuple[int, int],
+    gridd: Dict[str, Any],
+    multz: Union[Dict[int, int], None] = None,
+    empts: Union[Iterable[int], None] = None,
+    style: str = "whitegrid",
+):
     """Establish figure set-up with subplots."""
     sns.set(
-        style=style,
+        style=style,  # type: ignore
         font_scale=0.7,
         color_codes=True,
         palette="colorblind",
@@ -81,20 +87,6 @@ def getSetup(figsize, gridd, multz=None, empts=None, style="whitegrid"):
     return np.array(ax), f
 
 
-def subplotLabel(axs):
-    """Place subplot labels on figure."""
-    for ii, ax in enumerate(axs):
-        ax.text(
-            -0.2,
-            1.2,
-            ascii_lowercase[ii],
-            transform=ax.transAxes,
-            fontsize=16,
-            fontweight="bold",
-            va="top",
-        )
-
-
 def genFigure():
     """Main figure generation function."""
     logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.INFO)
@@ -103,7 +95,7 @@ def genFigure():
     nameOut = "figure" + sys.argv[1]
 
     exec("from liver_iri.figures." + nameOut + " import makeFigure", globals())
-    ff = makeFigure()
+    ff = makeFigure()  # type: ignore
     ff.savefig(
         fdir + nameOut + ".svg", dpi=300, bbox_inches="tight", pad_inches=0
     )
@@ -113,20 +105,9 @@ def genFigure():
     )
 
 
-def overlayCartoon(figFile, cartoonFile, x, y, scalee=1):
-    """Add cartoon to a figure file."""
-
-    # Overlay Figure cartoons
-    template = st.fromfile(figFile)
-    cartoon = st.fromfile(cartoonFile).getroot()
-
-    cartoon.moveto(x, y, scale=scalee)
-
-    template.append(cartoon)
-    template.save(figFile)
-
-
-def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series = None):
+def plot_scatter(
+    df: pd.DataFrame, ax: Axes, cmap: Union[pd.Series, None] = None
+):
     """
     Plots scatter with regression line.
 
@@ -139,24 +120,17 @@ def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series = None):
         None. Modifies provided ax.
     """
     df = df.dropna(axis=0)
-    score, model = predict_continuous(
-        df.iloc[:, 0],
-        df.iloc[:, 1]
-    )
+    score, model = predict_continuous(df.iloc[:, 0], df.iloc[:, 1])
 
     if cmap is None:
-        ax.scatter(
-            df.iloc[:, 0],
-            df.iloc[:, 1],
-            s=6
-        )
+        ax.scatter(df.iloc[:, 0], df.iloc[:, 1], s=6)
     else:
         ax.scatter(
             df.iloc[:, 0],
             df.iloc[:, 1],
             c=cmap.loc[df.index],
             cmap="coolwarm",
-            s=6
+            s=6,
         )
 
     x_lim = ax.get_xlim()
@@ -165,12 +139,12 @@ def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series = None):
     xs = [0, df.iloc[:, 0].max() * 1.05]
     ys = [
         model.params.iloc[0] + model.params.iloc[1] * xs[0],
-        model.params.iloc[0] + model.params.iloc[1] * xs[1]
+        model.params.iloc[0] + model.params.iloc[1] * xs[1],
     ]
 
     ax.plot(xs, ys, color="k", linestyle="--")
-    ax.set_xlabel(df.columns[0])
-    ax.set_ylabel(df.columns[1])
+    ax.set_xlabel(df.columns[0])  # type: ignore
+    ax.set_ylabel(df.columns[1])  # type: ignore
 
     ax.text(
         0.98,
@@ -179,7 +153,7 @@ def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series = None):
         ha="right",
         ma="right",
         va="bottom",
-        transform=ax.transAxes
+        transform=ax.transAxes,
     )
     ax.set_xlim(x_lim)
     ax.set_ylim(y_lim)
