@@ -11,13 +11,21 @@ on:
 
 jobs:
   build:
-
     runs-on: self-hosted
     steps:
+    - uses: actions/checkout@v4
     - name: Install dependencies
       uses: eifinger/setup-rye@v4
       with:
         enable-cache: true
         version: '0.39.0'
+    - name: Setup environment
+      run: make .venv
     - name: Test with pytest
       run: make test
+    - name: Run pyright check
+      run: make pyright
+    - name: Check formatting
+      run: rye fmt --check liver_iri
+    - name: Check linting
+      run: rye lint liver_iri

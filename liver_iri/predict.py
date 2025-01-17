@@ -1,3 +1,4 @@
+from typing import Union
 import warnings
 
 from lifelines import CoxPHFitter
@@ -7,16 +8,18 @@ import pandas as pd
 import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.base import BaseEstimator
-from sklearn.linear_model import (ElasticNet, ElasticNetCV, LinearRegression,
-                                  LogisticRegression, LogisticRegressionCV)
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, r2_score
-from sklearn.model_selection import (KFold, LeaveOneOut, StratifiedKFold,
-                                     cross_val_predict)
+from sklearn.linear_model import (
+    LogisticRegression,
+    LogisticRegressionCV,
+)
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
+from sklearn.model_selection import (
+    KFold,
+    StratifiedKFold
+)
 import statsmodels.api as sm
 
 warnings.filterwarnings("ignore")
-
 
 OPTIMAL_TPLS = 2
 kf = KFold(n_splits=10)
@@ -26,7 +29,7 @@ skf = StratifiedKFold(n_splits=20)
 def oversample(
     tensors: list[np.ndarray],
     labels: pd.Series,
-    column: str = None
+    column: Union[str, None] = None,
 ):
     """
     Over-/under-samples tensor data to form balanced dataset.
@@ -41,16 +44,13 @@ def oversample(
     """
     oversampler = RandomOverSampler(random_state=42)
     if column is None:
-        oversampler.fit_resample(labels.values.reshape(-1, 1), labels)
+        oversampler.fit_resample(labels.to_numpy().reshape(-1, 1), labels)
     else:
         oversampler.fit_resample(
-            labels.loc[:, column].values.reshape(-1, 1),
-            labels.loc[:, column]
+            labels.loc[:, column].values.reshape(-1, 1), labels.loc[:, column]
         )
 
-    tensors = [
-        tensor[oversampler.sample_indices_, :, :] for tensor in tensors
-    ]
+    tensors = [tensor[oversampler.sample_indices_, :, :] for tensor in tensors]
     labels = labels.iloc[oversampler.sample_indices_]
 
     return tensors, labels
@@ -91,12 +91,9 @@ def run_coupled_tpls_classification(
     tpls.fit(tensors, labels.values)
 
     predicted = pd.Series(0, index=labels.index)
-    if return_proba:
-        probabilities = predicted.copy()
-    elif return_components:
-        components = pd.DataFrame(
-            0, index=labels.index, columns=np.arange(rank) + 1
-        )
+    components = pd.DataFrame(
+        0, index=labels.index, columns=np.arange(rank) + 1
+    )
 
     model = LogisticRegressionCV(
         l1_ratios=np.linspace(0, 1, 11),
@@ -128,21 +125,26 @@ def run_coupled_tpls_classification(
         train_transformed = tpls.transform(train_data)
         test_transformed = tpls.transform(test_data)
         model.fit(train_transformed, train_labels)
-        predicted.iloc[test_index] = model.predict(test_transformed)
 
         if return_proba:
-            probabilities.iloc[test_index] = model.predict_proba(
-                test_transformed
-            )[:, 1]
+            predicted.iloc[test_index] = model.predict_proba(test_transformed)[
+                :, 1
+            ]
         elif return_components:
             components.iloc[test_index, :] = test_transformed
+        else:
+            predicted.iloc[test_index] = model.predict(test_transformed)
 
-    acc = accuracy_score(labels, predicted)
+    if return_proba:
+        acc = accuracy_score(labels, predicted.round().astype(int))
+    else:
+        acc = accuracy_score(labels, predicted)
+
     tpls.fit(tensors, labels.values)
     model.fit(tpls.transform(tensors), labels)
 
     if return_proba:
-        return (tpls, model), acc, probabilities
+        return (tpls, model), acc, predicted
     elif return_components:
         return (tpls, model), acc, components
     else:
@@ -150,9 +152,7 @@ def run_coupled_tpls_classification(
 
 
 def run_tpls_survival(
-    tensors: list[np.ndarray],
-    labels: pd.DataFrame,
-    rank: int = OPTIMAL_TPLS
+    tensors: list[np.ndarray], labels: pd.DataFrame, rank: int = OPTIMAL_TPLS
 ):
     """
     Runs survival regression via coupled tPLS.
@@ -177,17 +177,14 @@ def run_tpls_survival(
     model = CoxPHFitter(penalizer=0.05, l1_ratio=0.2)
 
     for train_index, test_index in skf.split(
-        labels.loc[:, "graft_death"],
-        labels.loc[:, "graft_death"]
+        labels.loc[:, "graft_death"], labels.loc[:, "graft_death"]
     ):
         train_data = [tensor[train_index, :, :] for tensor in tensors]
         test_data = [tensor[test_index, :, :] for tensor in tensors]
         train_labels = labels.iloc[train_index, :]
 
         train_data, train_labels = oversample(
-            train_data,
-            train_labels,
-            column="graft_death"
+            train_data, train_labels, column="graft_death"
         )
         tpls.fit(train_data, train_labels.values)
 
@@ -197,23 +194,18 @@ def run_tpls_survival(
         train_transformed = pd.DataFrame(
             train_transformed,
             index=train_labels.index,
-            columns=np.arange(tpls.n_components) + 1
+            columns=np.arange(tpls.n_components) + 1,
         )
-        train_transformed = pd.concat(
-            [train_transformed, train_labels],
-            axis=1
-        )
+        train_transformed = pd.concat([train_transformed, train_labels], axis=1)
         model.fit(
             train_transformed,
             duration_col="survival_time",
-            event_col="graft_death"
+            event_col="graft_death",
         )
         predicted.iloc[test_index] = model.predict_expectation(test_transformed)
 
     c_index = concordance_index(
-        labels.loc[:, "survival_time"],
-        predicted,
-        labels.loc[:, "graft_death"]
+        labels.loc[:, "survival_time"], predicted, labels.loc[:, "graft_death"]
     )
 
     return (tpls, model), c_index, predicted
@@ -236,8 +228,7 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
     predicted = pd.Series(0, index=labels.index)
 
     for train_index, test_index in skf.split(
-        labels.loc[:, "graft_death"],
-        labels.loc[:, "graft_death"]
+        labels.loc[:, "graft_death"], labels.loc[:, "graft_death"]
     ):
         train_data = data.iloc[train_index]
         test_data = data.iloc[test_index]
@@ -252,22 +243,20 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
         train_labels = train_labels.iloc[oversampler.sample_indices_]
         train_data = pd.concat([train_data, train_labels], axis=1)
         model.fit(
-            train_data,
-            duration_col="survival_time",
-            event_col="graft_death"
+            train_data, duration_col="survival_time", event_col="graft_death"
         )
         predicted.iloc[test_index] = model.predict_expectation(test_data)
 
     c_index = concordance_index(
-        labels.loc[:, "survival_time"],
-        predicted,
-        labels.loc[:, "graft_death"]
+        labels.loc[:, "survival_time"], predicted, labels.loc[:, "graft_death"]
     )
 
     return model, c_index, predicted
 
 
-def predict_continuous(data: xr.Dataset, labels: pd.Series):
+def predict_continuous(
+    data: Union[pd.DataFrame, pd.Series], labels: pd.Series
+):
     """
     Fits Elastic Net model and hyperparameters to provided data.
 
@@ -280,18 +269,16 @@ def predict_continuous(data: xr.Dataset, labels: pd.Series):
         model (sklearn.LogisticRegressionCV)
     """
     labels = labels.reset_index(drop=True)
-    labels = labels[labels != "Unknown"]
+    labels = labels.loc[labels != "Unknown"]
 
-    if isinstance(data, pd.Series):
-        data = data.iloc[labels.index]
-        data = data.values.reshape(-1, 1)
-    elif isinstance(data, pd.DataFrame):
-        data = data.iloc[labels.index, :]
+    if isinstance(data, pd.DataFrame):
+        sm_data = data.iloc[labels.index, :]
     else:
-        data = data[labels.index, :]
+        data = data.iloc[labels.index]
+        sm_data = data.to_numpy().reshape(-1, 1)
 
-    data = sm.add_constant(data)
-    model = sm.OLS(labels, data, missing="drop")
+    sm_data = sm.add_constant(sm_data)
+    model = sm.OLS(labels, sm_data, missing="drop")
     results = model.fit()
 
     return results.rsquared_adj, results
@@ -338,9 +325,7 @@ def predict_categorical(
     else:
         model.fit(data, labels)
 
-    if balanced_resample:
-        oversampler = RandomOverSampler(random_state=42)
-
+    oversampler = RandomOverSampler(random_state=42)
     model = LogisticRegression(
         C=model.C_[0],
         l1_ratio=model.l1_ratio_[0],
@@ -349,18 +334,19 @@ def predict_categorical(
         max_iter=100000,
     )
     predicted = pd.Series(index=labels.index)
+
     for train_index, test_index in skf.split(data, labels):
         train_data = data.iloc[train_index, :]
         train_labels = labels.iloc[train_index]
         test_data = data.iloc[test_index, :]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore
                 train_data, train_labels
             )
 
         if data.shape[1] < 2:
-            model.fit(train_data.values.reshape(-1, 1), train_labels)
+            model.fit(train_data.to_numpy().reshape(-1, 1), train_labels)
         else:
             model.fit(train_data, train_labels)
 
@@ -397,9 +383,7 @@ def predict_clinical(
     Returns:
         score (float): Prediction accuracy
     """
-    if balanced_resample:
-        oversampler = RandomOverSampler(random_state=42)
-
+    oversampler = RandomOverSampler(random_state=42)
     model = LogisticRegression()
     predicted = pd.Series(index=labels.index)
     for train_index, test_index in skf.split(data, labels):
@@ -407,9 +391,10 @@ def predict_clinical(
         train_labels = labels.iloc[train_index]
         test_data = data.iloc[test_index]
 
-        train_data, train_labels = oversampler.fit_resample(
-            train_data.values.reshape(-1, 1), train_labels
-        )
+        if balanced_resample:
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore
+                train_data.to_numpy().reshape(-1, 1), train_labels
+            )
 
         model.fit(train_data, train_labels)
 
@@ -427,50 +412,3 @@ def predict_clinical(
     else:
         acc = balanced_accuracy_score(labels, predicted)
         return acc
-
-
-def get_probabilities(
-    model: BaseEstimator, data: pd.DataFrame, labels: pd.Series
-):
-    """
-    Returns probabilities of positive classification via cross-validation.
-
-    Parameters:
-        model (sklearn.BaseEstimator): sklearn model; must have predict_proba()
-        data (pandas.DataFrame): Data to predict
-        labels (pandas.Series): Labels for provided data
-
-    Returns:
-        pd.Series: probability of positive class for each sample
-    """
-    np.random.seed(215)
-
-    if isinstance(labels, pd.Series):
-        labels = labels.reset_index(drop=True)
-    else:
-        labels = pd.Series(labels)
-
-    labels = labels[labels != "Unknown"]
-
-    if isinstance(data, pd.Series):
-        data = data.iloc[labels.index]
-        data = data.values.reshape(-1, 1)
-    elif isinstance(data, pd.DataFrame):
-        data = data.iloc[labels.index, :].values
-    else:
-        data = data[labels.index, :]
-
-    probabilities = np.zeros(data.shape[0])
-    for train_index, test_index in skf.split(data, labels):
-        train_data = data[train_index, :]
-        train_labels = labels.iloc[train_index]
-        test_data = data[test_index, :]
-        oversampler = RandomOverSampler(random_state=42)
-        train_data, train_labels = oversampler.fit_resample(
-            train_data, train_labels
-        )
-
-        model.fit(train_data, train_labels)
-        probabilities[test_index] = model.predict_proba(test_data)[:, 1]
-
-    return probabilities

@@ -5,7 +5,7 @@ SHELL := /bin/bash
 flist = $(filter-out liver_iri/figures/figure2.py liver_iri/figures/figure4.py, $(wildcard liver_iri/figures/figure*.py))
 allOutput = $(patsubst liver_iri/figures/figure%.py, output/figure%.svg, $(flist))
 
-.venv:
+.venv: pyproject.toml
 	rye sync
 
 all: $(allOutput)
@@ -26,3 +26,6 @@ testprofile: .venv
 
 clean:
 	rm -rf output
+
+pyright: .venv
+	rye run pyright liver_iri
