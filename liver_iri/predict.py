@@ -9,11 +9,20 @@ import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.base import BaseEstimator
-from sklearn.linear_model import (ElasticNet, ElasticNetCV, LinearRegression,
-                                  LogisticRegression, LogisticRegressionCV)
+from sklearn.linear_model import (
+    ElasticNet,
+    ElasticNetCV,
+    LinearRegression,
+    LogisticRegression,
+    LogisticRegressionCV,
+)
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, r2_score
-from sklearn.model_selection import (KFold, LeaveOneOut, StratifiedKFold,
-                                     cross_val_predict)
+from sklearn.model_selection import (
+    KFold,
+    LeaveOneOut,
+    StratifiedKFold,
+    cross_val_predict,
+)
 import statsmodels.api as sm
 
 warnings.filterwarnings("ignore")
@@ -26,7 +35,7 @@ skf = StratifiedKFold(n_splits=20)
 def oversample(
     tensors: list[np.ndarray],
     labels: pd.Series,
-    column: Union[str, None] = None
+    column: Union[str, None] = None,
 ):
     """
     Over-/under-samples tensor data to form balanced dataset.
@@ -44,13 +53,10 @@ def oversample(
         oversampler.fit_resample(labels.to_numpy().reshape(-1, 1), labels)
     else:
         oversampler.fit_resample(
-            labels.loc[:, column].values.reshape(-1, 1),
-            labels.loc[:, column]
+            labels.loc[:, column].values.reshape(-1, 1), labels.loc[:, column]
         )
 
-    tensors = [
-        tensor[oversampler.sample_indices_, :, :] for tensor in tensors
-    ]
+    tensors = [tensor[oversampler.sample_indices_, :, :] for tensor in tensors]
     labels = labels.iloc[oversampler.sample_indices_]
 
     return tensors, labels
@@ -127,9 +133,9 @@ def run_coupled_tpls_classification(
         model.fit(train_transformed, train_labels)
 
         if return_proba:
-            predicted.iloc[test_index] = model.predict_proba(
-                test_transformed
-            )[:, 1]
+            predicted.iloc[test_index] = model.predict_proba(test_transformed)[
+                :, 1
+            ]
         elif return_components:
             components.iloc[test_index, :] = test_transformed
         else:
@@ -152,9 +158,7 @@ def run_coupled_tpls_classification(
 
 
 def run_tpls_survival(
-    tensors: list[np.ndarray],
-    labels: pd.DataFrame,
-    rank: int = OPTIMAL_TPLS
+    tensors: list[np.ndarray], labels: pd.DataFrame, rank: int = OPTIMAL_TPLS
 ):
     """
     Runs survival regression via coupled tPLS.
@@ -179,17 +183,14 @@ def run_tpls_survival(
     model = CoxPHFitter(penalizer=0.05, l1_ratio=0.2)
 
     for train_index, test_index in skf.split(
-            labels.loc[:, "graft_death"],
-            labels.loc[:, "graft_death"]
+        labels.loc[:, "graft_death"], labels.loc[:, "graft_death"]
     ):
         train_data = [tensor[train_index, :, :] for tensor in tensors]
         test_data = [tensor[test_index, :, :] for tensor in tensors]
         train_labels = labels.iloc[train_index, :]
 
         train_data, train_labels = oversample(
-            train_data,
-            train_labels,
-            column="graft_death"
+            train_data, train_labels, column="graft_death"
         )
         tpls.fit(train_data, train_labels.values)
 
@@ -199,23 +200,18 @@ def run_tpls_survival(
         train_transformed = pd.DataFrame(
             train_transformed,
             index=train_labels.index,
-            columns=np.arange(tpls.n_components) + 1
+            columns=np.arange(tpls.n_components) + 1,
         )
-        train_transformed = pd.concat(
-            [train_transformed, train_labels],
-            axis=1
-        )
+        train_transformed = pd.concat([train_transformed, train_labels], axis=1)
         model.fit(
             train_transformed,
             duration_col="survival_time",
-            event_col="graft_death"
+            event_col="graft_death",
         )
         predicted.iloc[test_index] = model.predict_expectation(test_transformed)
 
     c_index = concordance_index(
-        labels.loc[:, "survival_time"],
-        predicted,
-        labels.loc[:, "graft_death"]
+        labels.loc[:, "survival_time"], predicted, labels.loc[:, "graft_death"]
     )
 
     return (tpls, model), c_index, predicted
@@ -238,8 +234,7 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
     predicted = pd.Series(0, index=labels.index)
 
     for train_index, test_index in skf.split(
-            labels.loc[:, "graft_death"],
-            labels.loc[:, "graft_death"]
+        labels.loc[:, "graft_death"], labels.loc[:, "graft_death"]
     ):
         train_data = data.iloc[train_index, :]
         test_data = data.iloc[test_index, :]
@@ -250,24 +245,19 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
         train_labels = train_labels.iloc[oversampler.sample_indices_, :]
         train_data = pd.concat([train_data, train_labels], axis=1)
         model.fit(
-            train_data,
-            duration_col="survival_time",
-            event_col="graft_death"
+            train_data, duration_col="survival_time", event_col="graft_death"
         )
         predicted.iloc[test_index] = model.predict_expectation(test_data)
 
     c_index = concordance_index(
-        labels.loc[:, "survival_time"],
-        predicted,
-        labels.loc[:, "graft_death"]
+        labels.loc[:, "survival_time"], predicted, labels.loc[:, "graft_death"]
     )
 
     return model, c_index, predicted
 
 
 def predict_continuous(
-    data: Union[xr.Dataset, pd.DataFrame],
-    labels: pd.Series
+    data: Union[xr.Dataset, pd.DataFrame], labels: pd.Series
 ):
     """
     Fits Elastic Net model and hyperparameters to provided data.

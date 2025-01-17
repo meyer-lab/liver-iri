@@ -1,6 +1,7 @@
 """
 This file contains functions that are used in multiple figures.
 """
+
 from decimal import Decimal
 from typing import Any, Dict, Iterable, Tuple, Union
 
@@ -48,7 +49,7 @@ def getSetup(
     gridd: Dict[str, Any],
     multz: Union[Dict[int, int], None] = None,
     empts: Union[Iterable[int], None] = None,
-    style: str = "whitegrid"
+    style: str = "whitegrid",
 ):
     """Establish figure set-up with subplots."""
     sns.set(
@@ -105,9 +106,7 @@ def genFigure():
 
 
 def plot_scatter(
-    df: pd.DataFrame,
-    ax: Axes,
-    cmap: Union[pd.Series, None] = None
+    df: pd.DataFrame, ax: Axes, cmap: Union[pd.Series, None] = None
 ):
     """
     Plots scatter with regression line.
@@ -121,24 +120,17 @@ def plot_scatter(
         None. Modifies provided ax.
     """
     df = df.dropna(axis=0)
-    score, model = predict_continuous(
-        df.iloc[:, 0],
-        df.iloc[:, 1]
-    )
+    score, model = predict_continuous(df.iloc[:, 0], df.iloc[:, 1])
 
     if cmap is None:
-        ax.scatter(
-            df.iloc[:, 0],
-            df.iloc[:, 1],
-            s=6
-        )
+        ax.scatter(df.iloc[:, 0], df.iloc[:, 1], s=6)
     else:
         ax.scatter(
             df.iloc[:, 0],
             df.iloc[:, 1],
             c=cmap.loc[df.index],
             cmap="coolwarm",
-            s=6
+            s=6,
         )
 
     x_lim = ax.get_xlim()
@@ -147,7 +139,7 @@ def plot_scatter(
     xs = [0, df.iloc[:, 0].max() * 1.05]
     ys = [
         model.params.iloc[0] + model.params.iloc[1] * xs[0],
-        model.params.iloc[0] + model.params.iloc[1] * xs[1]
+        model.params.iloc[0] + model.params.iloc[1] * xs[1],
     ]
 
     ax.plot(xs, ys, color="k", linestyle="--")
@@ -161,7 +153,7 @@ def plot_scatter(
         ha="right",
         ma="right",
         va="bottom",
-        transform=ax.transAxes
+        transform=ax.transAxes,
     )
     ax.set_xlim(x_lim)
     ax.set_ylim(y_lim)
