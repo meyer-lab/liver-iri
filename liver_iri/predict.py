@@ -8,20 +8,14 @@ import pandas as pd
 import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.base import BaseEstimator
 from sklearn.linear_model import (
-    ElasticNet,
-    ElasticNetCV,
-    LinearRegression,
     LogisticRegression,
     LogisticRegressionCV,
 )
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, r2_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.model_selection import (
     KFold,
-    LeaveOneOut,
-    StratifiedKFold,
-    cross_val_predict,
+    StratifiedKFold
 )
 import statsmodels.api as sm
 
@@ -257,7 +251,7 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
 
 
 def predict_continuous(
-    data: Union[xr.Dataset, pd.DataFrame], labels: pd.Series
+    data: Union[pd.DataFrame, pd.Series], labels: pd.Series
 ):
     """
     Fits Elastic Net model and hyperparameters to provided data.
@@ -272,9 +266,14 @@ def predict_continuous(
     """
     labels = labels.reset_index(drop=True)
     labels = labels.loc[labels != "Unknown"]
-    data = data.iloc[labels.index, :]
 
-    sm_data = sm.add_constant(data)
+    if isinstance(data, pd.DataFrame):
+        sm_data = data.iloc[labels.index, :]
+    else:
+        data = data.iloc[labels.index]
+        sm_data = data.to_numpy().reshape(-1, 1)
+
+    sm_data = sm.add_constant(sm_data)
     model = sm.OLS(labels, sm_data, missing="drop")
     results = model.fit()
 
