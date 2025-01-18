@@ -2,20 +2,19 @@
 This file contains functions that are used in multiple figures.
 """
 
-from decimal import Decimal
-from typing import Any, Dict, Iterable, Tuple, Union
-
 import logging
 import sys
 import time
+from decimal import Decimal
+from typing import Any, Dict, Iterable, Tuple, Union
 
-from matplotlib.axes import Axes
 import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import gridspec
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 
 from ..predict import predict_continuous
 

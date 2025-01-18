@@ -1,10 +1,10 @@
 """Plots Figure 2b -- CTF Factorization Timepoints"""
-import numpy as np
-import xarray as xr
 
-from .common import getSetup
+import numpy as np
+
 from ..dataimport import build_coupled_tensors
 from ..tensor import run_coupled
+from .common import getSetup
 
 
 def makeFigure():
@@ -13,10 +13,7 @@ def makeFigure():
     ############################################################################
 
     data = build_coupled_tensors(
-        peripheral_scaling=1,
-        pv_scaling=1,
-        lft_scaling=1,
-        no_missing=True
+        peripheral_scaling=1, pv_scaling=1, lft_scaling=1, no_missing=True
     )
 
     ############################################################################

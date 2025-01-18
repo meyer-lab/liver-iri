@@ -1,17 +1,19 @@
 """Plots Figure 6 -- Model Comparisons"""
+
 import warnings
 
-from lifelines import KaplanMeierFitter
-from lifelines.utils import concordance_index
 import numpy as np
 import pandas as pd
+import xarray as xr
+from lifelines import KaplanMeierFitter
+from lifelines.utils import concordance_index
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import scale
-import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import (oversample, predict_categorical, run_survival,
-                       run_coupled_tpls_classification, run_tpls_survival)
+from ..predict import (oversample, predict_categorical,
+                       run_coupled_tpls_classification, run_survival,
+                       run_tpls_survival)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 
@@ -43,12 +45,16 @@ def makeFigure():
     tensors, labels = convert_to_numpy(data, labels)
     val_tensors, val_labels = convert_to_numpy(val_data, val_labels)
 
-    cytokine_data = data["Cytokine Measurements"].stack(
-        Flattened=["Cytokine", "Cytokine Timepoint"]
-    ).to_pandas()
-    lft_data = data["LFT Measurements"].stack(
-        Flattened=["LFT Score", "LFT Timepoint"]
-    ).to_pandas()
+    cytokine_data = (
+        data["Cytokine Measurements"]
+        .stack(Flattened=["Cytokine", "Cytokine Timepoint"])
+        .to_pandas()
+    )
+    lft_data = (
+        data["LFT Measurements"]
+        .stack(Flattened=["LFT Score", "LFT Timepoint"])
+        .to_pandas()
+    )
 
     cytokine_data.columns = np.arange(cytokine_data.shape[1])
     lft_data.columns = np.arange(lft_data.shape[1])
@@ -74,29 +80,24 @@ def makeFigure():
     pv_acc, pv_model, pv_proba = predict_categorical(
         pv_cytokines,
         labels.loc[pv_cytokines.index, "graft_death"],
-        return_proba=True
+        return_proba=True,
     )
     peripheral_acc, peripheral_model, peripheral_proba = predict_categorical(
         peripheral_cytokines,
         labels.loc[peripheral_cytokines.index, "graft_death"],
-        return_proba=True
+        return_proba=True,
     )
     lft_acc, lft_model, lft_proba = predict_categorical(
-        lft_data,
-        labels.loc[lft_data.index, "graft_death"],
-        return_proba=True
+        lft_data, labels.loc[lft_data.index, "graft_death"], return_proba=True
     )
     pv_fpr, pv_tpr, _ = roc_curve(
-        labels.loc[pv_cytokines.index, "graft_death"],
-        pv_proba
+        labels.loc[pv_cytokines.index, "graft_death"], pv_proba
     )
     peripheral_fpr, peripheral_tpr, _ = roc_curve(
-        labels.loc[peripheral_cytokines.index, "graft_death"],
-        peripheral_proba
+        labels.loc[peripheral_cytokines.index, "graft_death"], peripheral_proba
     )
     lft_fpr, lft_tpr, _ = roc_curve(
-        labels.loc[lft_data.index, "graft_death"],
-        lft_proba
+        labels.loc[lft_data.index, "graft_death"], lft_proba
     )
     tpls_fpr, tpls_tpr, _ = roc_curve(labels.loc[:, "graft_death"], tpls_proba)
 
@@ -134,15 +135,12 @@ def makeFigure():
     # Figure 6D-E: Cox-PH
     ############################################################################
 
-    (tpls, cox_ph), c_index, cph_expected = run_tpls_survival(
-        tensors, labels
-    )
+    (tpls, cox_ph), c_index, cph_expected = run_tpls_survival(tensors, labels)
     oversampled_tensors, oversampled_labels = oversample(
         tensors, labels, column="graft_death"
     )
     tpls.fit(
-        oversampled_tensors,
-        oversampled_labels.loc[:, "graft_death"].values
+        oversampled_tensors, oversampled_labels.loc[:, "graft_death"].values
     )
 
     _, pv_c_index, _ = run_survival(pv_cytokines, labels)
@@ -162,8 +160,8 @@ def makeFigure():
             "PV Cytokines",
             "Peripheral Cytokines",
             "Pathology Score",
-            "tPLS"
-        ]
+            "tPLS",
+        ],
     )
     ax.set_xticks(np.arange(5))
     ax.set_xticklabels(
@@ -172,9 +170,12 @@ def makeFigure():
             "PV Cytokines",
             "Peripheral\nCytokines",
             "Pathology\nScore",
-            "tPLS"
+            "tPLS",
         ],
-        ha="right", ma="right", va="top", rotation=45
+        ha="right",
+        ma="right",
+        va="top",
+        rotation=45,
     )
 
     ax.legend()
@@ -192,7 +193,7 @@ def makeFigure():
         linestyle="",
         marker="o",
         capsize=5,
-        xerr=cox_ph.standard_errors_ * 1.96
+        xerr=cox_ph.standard_errors_ * 1.96,
     )
 
     ax.set_yticks([0, 1])
@@ -212,7 +213,7 @@ def makeFigure():
     components = pd.DataFrame(
         tpls.transform(merged_tensors),
         index=merged_labels.index,
-        columns=np.arange(tpls.n_components) + 1
+        columns=np.arange(tpls.n_components) + 1,
     )
     components.loc[:, "Sum"] = scale(components).sum(axis=1)
     threshold = int(components.shape[0] / 10)
@@ -224,24 +225,24 @@ def makeFigure():
         low_index = components.index[threshold:]
         kmf.fit(
             merged_labels.loc[high_index, "survival_time"],
-            merged_labels.loc[high_index, "graft_death"]
+            merged_labels.loc[high_index, "graft_death"],
         )
         ax.plot(
             kmf.survival_function_.index,
             kmf.survival_function_.iloc[:, 0],
             label=f"High {column}",
-            color="tab:blue"
+            color="tab:blue",
         )
         max_index = kmf.survival_function_.index[-1]
         kmf.fit(
             merged_labels.loc[low_index, "survival_time"],
-            merged_labels.loc[low_index, "graft_death"]
+            merged_labels.loc[low_index, "graft_death"],
         )
         ax.plot(
             kmf.survival_function_.index,
             kmf.survival_function_.iloc[:, 0],
             label=f"Low {column}",
-            color="tab:orange"
+            color="tab:orange",
         )
         if kmf.survival_function_.index[-1] > max_index:
             max_index = kmf.survival_function_.index[-1]

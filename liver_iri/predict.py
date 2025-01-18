@@ -1,23 +1,17 @@
-from typing import Union
 import warnings
+from typing import Union
 
-from lifelines import CoxPHFitter
-from lifelines.utils import concordance_index
 import numpy as np
 import pandas as pd
+import statsmodels.api as sm
 import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.linear_model import (
-    LogisticRegression,
-    LogisticRegressionCV,
-)
+from lifelines import CoxPHFitter
+from lifelines.utils import concordance_index
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from sklearn.model_selection import (
-    KFold,
-    StratifiedKFold
-)
-import statsmodels.api as sm
+from sklearn.model_selection import KFold, StratifiedKFold
 
 warnings.filterwarnings("ignore")
 
@@ -254,9 +248,7 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
     return model, c_index, predicted
 
 
-def predict_continuous(
-    data: Union[pd.DataFrame, pd.Series], labels: pd.Series
-):
+def predict_continuous(data: Union[pd.DataFrame, pd.Series], labels: pd.Series):
     """
     Fits Elastic Net model and hyperparameters to provided data.
 
@@ -369,7 +361,7 @@ def predict_clinical(
     data: pd.Series,
     labels: pd.Series,
     balanced_resample: bool = True,
-    return_proba: bool = False
+    return_proba: bool = False,
 ):
     """
     Fits Logistic Regression model and hyperparameters to provided data.

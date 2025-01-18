@@ -1,9 +1,9 @@
 from typing import Union
 
 import numpy as np
-from numpy.linalg import norm
 import pandas as pd
 import xarray as xr
+from numpy.linalg import norm
 from tensorpack.coupled import CoupledTensor
 
 from liver_iri.dataimport import build_coupled_tensors

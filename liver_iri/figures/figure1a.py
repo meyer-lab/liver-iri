@@ -1,9 +1,10 @@
 """Plots Figure 1a -- Raw Data Heatmaps"""
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.preprocessing import LabelEncoder
 import xarray as xr
+from sklearn.preprocessing import LabelEncoder
 
 from ..dataimport import build_coupled_tensors, import_meta
 from ..utils import reorder_table
@@ -48,12 +49,16 @@ def makeFigure():
     # Data flattening
     ############################################################################
 
-    cytokines = data["Cytokine Measurements"].stack(
-        Flattened=["Cytokine Timepoint", "Cytokine"]
-    ).to_pandas()
-    lfts = data["LFT Measurements"].stack(
-        Flattened=["LFT Timepoint", "LFT Score"]
-    ).to_pandas()
+    cytokines = (
+        data["Cytokine Measurements"]
+        .stack(Flattened=["Cytokine Timepoint", "Cytokine"])
+        .to_pandas()
+    )
+    lfts = (
+        data["LFT Measurements"]
+        .stack(Flattened=["LFT Timepoint", "LFT Score"])
+        .to_pandas()
+    )
 
     merged = pd.concat([cytokines, lfts], axis=1)  # type: ignore
     missing = np.isnan(merged)
@@ -73,7 +78,7 @@ def makeFigure():
         meta.loc[merged.index, :].astype(float),
         cmap="tab10",
         ax=axs[0],
-        cbar=False
+        cbar=False,
     )
 
     axs[0].set_xticks([])
@@ -83,7 +88,7 @@ def makeFigure():
 
     # Cytokines
     heatmap = sns.heatmap(
-        merged.iloc[:, :cytokines.shape[1]],
+        merged.iloc[:, : cytokines.shape[1]],
         cmap="coolwarm",
         ax=axs[2],
         cbar=False,
@@ -97,10 +102,10 @@ def makeFigure():
 
     # LFTs
     heatmap = sns.heatmap(
-        merged.iloc[:, cytokines.shape[1]:],
+        merged.iloc[:, cytokines.shape[1] :],
         cmap="coolwarm",
         ax=axs[3],
-        mask=missing.iloc[:, cytokines.shape[1]:].values,
+        mask=missing.iloc[:, cytokines.shape[1] :].values,
     )
     heatmap.set_facecolor("lightgrey")
 

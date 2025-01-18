@@ -1,4 +1,5 @@
 """Plots Figure 6bc-- tPLS 2 Heatmap"""
+
 import warnings
 
 import numpy as np
@@ -36,17 +37,14 @@ def makeFigure():
     all_tensors, all_labels = convert_to_numpy(all_data, all_labels)
 
     raw_data = build_coupled_tensors(
-        lft_scaling=1,
-        pv_scaling=1,
-        transform="log",
-        normalize=False
+        lft_scaling=1, pv_scaling=1, transform="log", normalize=False
     )
     raw_val = build_coupled_tensors(
         no_missing=False,
         lft_scaling=1,
         pv_scaling=1,
         transform="log",
-        normalize=False
+        normalize=False,
     )
     raw_data = xr.merge([raw_data, raw_val])
 
@@ -56,10 +54,7 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    axs, fig = getSetup(
-        (6, 3),
-        {"ncols": 1, "nrows": 1}
-    )
+    axs, fig = getSetup((6, 3), {"ncols": 1, "nrows": 1})
     ax = axs[0]
 
     ############################################################################
@@ -94,26 +89,29 @@ def makeFigure():
     # Component boxplots
     ############################################################################
 
-    high_mean = cytokine_measurements.sel(
-        {
-            "Patient": high_2,
-        }
-    ).mean("Patient").to_pandas()
-    low_mean = cytokine_measurements.sel(
-        {
-            "Patient": low_2,
-        }
-    ).mean("Patient").to_pandas()
+    high_mean = (
+        cytokine_measurements.sel(
+            {
+                "Patient": high_2,
+            }
+        )
+        .mean("Patient")
+        .to_pandas()
+    )
+    low_mean = (
+        cytokine_measurements.sel(
+            {
+                "Patient": low_2,
+            }
+        )
+        .mean("Patient")
+        .to_pandas()
+    )
     diff = high_mean - low_mean
     diff = reorder_table(diff.T).T
 
     sns.heatmap(
-        diff,
-        center=0,
-        ax=ax,
-        cmap="coolwarm",
-        square=True,
-        linewidths=0.1
+        diff, center=0, ax=ax, cmap="coolwarm", square=True, linewidths=0.1
     )
     ax.set_yticklabels(diff.index)
     ax.set_xticks(np.arange(0.5, diff.shape[1]))

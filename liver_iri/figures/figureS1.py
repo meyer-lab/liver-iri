@@ -1,14 +1,12 @@
 """Plots Figure S1 -- Missingness Quantification"""
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import ttest_ind, pearsonr
-from sklearn.preprocessing import LabelEncoder
 import xarray as xr
 
-from .common import getSetup, plot_scatter
-from ..dataimport import build_coupled_tensors, import_meta
-from ..tensor import run_coupled
+from ..dataimport import build_coupled_tensors
+from .common import getSetup
 
 
 def makeFigure():
@@ -17,16 +15,10 @@ def makeFigure():
     ############################################################################
 
     data = build_coupled_tensors(
-        pv_scaling=1,
-        lft_scaling=1,
-        no_missing=True,
-        normalize=False
+        pv_scaling=1, lft_scaling=1, no_missing=True, normalize=False
     )
     val_data = build_coupled_tensors(
-        pv_scaling=1,
-        lft_scaling=1,
-        no_missing=False,
-        normalize=False
+        pv_scaling=1, lft_scaling=1, no_missing=False, normalize=False
     )
     data = xr.merge([data, val_data])
 
@@ -46,8 +38,7 @@ def makeFigure():
             0,
             columns=data.Patient.values,
             index=data[data_set.dims[1]].values,
-
-            dtype=int
+            dtype=int,
         )
         tensor = np.isnan(data_set.to_numpy())
         for tp in np.arange(tensor.shape[1]):
@@ -60,7 +51,7 @@ def makeFigure():
             vmax=2,
             ax=ax,
             linewidths=0.1,
-            cbar=False
+            cbar=False,
         )
         ax.set_xticks([])
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)

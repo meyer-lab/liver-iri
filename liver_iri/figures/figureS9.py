@@ -1,10 +1,10 @@
 """Plots Figure S9 -- tPLS 2 v. CTF 1"""
+
 import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
-import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import oversample, run_coupled_tpls_classification
@@ -29,17 +29,14 @@ def makeFigure():
 
     tpls_data = build_coupled_tensors()
     cp_data = build_coupled_tensors(
-        peripheral_scaling=1,
-        pv_scaling=1,
-        lft_scaling=1,
-        no_missing=True
+        peripheral_scaling=1, pv_scaling=1, lft_scaling=1, no_missing=True
     )
     raw_data = build_coupled_tensors(
         pv_scaling=1,
         lft_scaling=1,
         no_missing=True,
         normalize=False,
-        transform="log"
+        transform="log",
     )
 
     ############################################################################
@@ -59,31 +56,28 @@ def makeFigure():
     ctf_factors = {
         "Patient": cp.x["_Patient"].to_pandas().iloc[:, 0],
         "Cytokine": cp.x["_Cytokine"].to_pandas().iloc[:, 0],
-        "Cytokine Timepoint": cp.x[
-            "_Cytokine Timepoint"
-        ].to_pandas().iloc[:, 0],
+        "Cytokine Timepoint": cp.x["_Cytokine Timepoint"]
+        .to_pandas()
+        .iloc[:, 0],
         "LFT": cp.x["_LFT Score"].to_pandas().iloc[:, 0],
-        "LFT Timepoint": cp.x["_LFT Timepoint"].to_pandas().iloc[:, 0]
+        "LFT Timepoint": cp.x["_LFT Timepoint"].to_pandas().iloc[:, 0],
     }
     tpls_factors = {
         "Patient": pd.Series(
             tpls.transform(cp_tensors)[:, 1],  # type: ignore
-            index=all_labels.index
+            index=all_labels.index,
         ),
         "Cytokine": tpls.Xs_factors[0][2][:, 1],
         "Cytokine Timepoint": tpls.Xs_factors[0][1][:, 1],
         "LFT": tpls.Xs_factors[1][2][:, 1],
-        "LFT Timepoint": tpls.Xs_factors[1][1][:, 1]
+        "LFT Timepoint": tpls.Xs_factors[1][1][:, 1],
     }
 
     ############################################################################
     # Figure setup
     ############################################################################
 
-    axs, fig = getSetup(
-        (9, 9),
-        {"nrows": 3, "ncols": 3}
-    )
+    axs, fig = getSetup((9, 9), {"nrows": 3, "ncols": 3})
 
     ticks = np.arange(-1, 1.1, 0.5)
 
@@ -94,15 +88,8 @@ def makeFigure():
     tpls_factor = tpls_factors["Patient"]
     ctf_factor = ctf_factors["Patient"]
 
-    graft_death = all_labels.replace({
-        0: "tab:green",
-        1: "tab:red"
-    })
-    component_association = pd.Series(
-        "grey",
-        index=all_labels.index,
-        dtype=str
-    )
+    graft_death = all_labels.replace({0: "tab:green", 1: "tab:red"})
+    component_association = pd.Series("grey", index=all_labels.index, dtype=str)
     component_association.loc[
         tpls_factor.sort_values(ascending=False).index[:40]
     ] = "tab:cyan"
@@ -111,8 +98,8 @@ def makeFigure():
     ] = "tab:blue"
     component_association.loc[
         list(
-            set(ctf_factor.sort_values(ascending=True).index[:40]) &
-            set(tpls_factor.sort_values(ascending=False).index[:40])
+            set(ctf_factor.sort_values(ascending=True).index[:40])
+            & set(tpls_factor.sort_values(ascending=False).index[:40])
         )
     ] = "black"
 
@@ -122,18 +109,8 @@ def makeFigure():
     factor_diff = factor_diff.sort_values(ascending=True)
 
     for ax, color in zip(axs[:2], [graft_death, component_association]):
-        ax.scatter(
-            tpls_factor,
-            ctf_factor,
-            c=color,
-            edgecolors="black"
-        )
-        ax.plot(
-            [-1.1, 1.1],
-            [1.1, -1.1],
-            linestyle="--",
-            color="black"
-        )
+        ax.scatter(tpls_factor, ctf_factor, c=color, edgecolors="black")
+        ax.plot([-1.1, 1.1], [1.1, -1.1], linestyle="--", color="black")
 
         ax.set_xlabel("tPLS")
         ax.set_ylabel("CTF")
@@ -153,16 +130,8 @@ def makeFigure():
         tpls_factor /= abs(tpls_factor).max()
         ctf_factor /= abs(ctf_factor).max()
 
-        ax.scatter(
-            tpls_factor,
-            ctf_factor
-        )
-        ax.plot(
-            [-1.1, 1.1],
-            [-1.1, 1.1],
-            linestyle="--",
-            color="black"
-        )
+        ax.scatter(tpls_factor, ctf_factor)
+        ax.plot([-1.1, 1.1], [-1.1, 1.1], linestyle="--", color="black")
         for index, val in enumerate(ctf_factor.index):
             ax.text(
                 tpls_factor[index],
@@ -170,7 +139,7 @@ def makeFigure():
                 s=val,
                 ha="center",
                 ma="center",
-                va="center"
+                va="center",
             )
 
         ax.set_xticks(ticks)
@@ -195,23 +164,18 @@ def makeFigure():
         if dimension == "Cytokine Timepoint":
             tpls_factor[[1, 2]] /= abs(tpls_factor[[1, 2]]).max()
 
-        ax.plot(
-            [-10, 10],
-            [0, 0],
-            linestyle="--",
-            color="black"
-        )
+        ax.plot([-10, 10], [0, 0], linestyle="--", color="black")
         ax.plot(
             np.arange(len(tpls_factor)),
             tpls_factor,
             label="tPLS",
-            color="tab:cyan"
+            color="tab:cyan",
         )
         ax.plot(
             np.arange(len(ctf_factor)),
             ctf_factor,
             label="CTF",
-            color="tab:blue"
+            color="tab:blue",
         )
 
         ax.set_xticks(np.arange(len(tpls_factor)))
@@ -231,11 +195,11 @@ def makeFigure():
     high_ctf = factor_diff.index[:30]
 
     for cytokine, ax in zip(["TGFa", "EGF", "Eotaxin"], axs[6:]):
-        cytokine_df = cytokine_measurements.loc[
-            {
-                "Cytokine": cytokine
-            }
-        ].squeeze().to_pandas()
+        cytokine_df = (
+            cytokine_measurements.loc[{"Cytokine": cytokine}]
+            .squeeze()
+            .to_pandas()
+        )
         timepoints = list(cytokine_df.columns)
         for index, tp in enumerate(cytokine_df.columns):
             low_patch = ax.boxplot(
@@ -245,10 +209,7 @@ def makeFigure():
                 notch=True,
                 vert=True,
                 widths=0.9,
-                flierprops={
-                    "markersize": 6,
-                    "markerfacecolor": "tab:blue"
-                }
+                flierprops={"markersize": 6, "markerfacecolor": "tab:blue"},
             )
             high_patch = ax.boxplot(
                 cytokine_df.loc[high_tpls, tp].dropna(),
@@ -257,16 +218,13 @@ def makeFigure():
                 notch=True,
                 vert=True,
                 widths=0.9,
-                flierprops={
-                    "markersize": 6,
-                    "markerfacecolor": "tab:orange"
-                }
+                flierprops={"markersize": 6, "markerfacecolor": "tab:orange"},
             )
             low_patch["boxes"][0].set_facecolor("tab:blue")
             high_patch["boxes"][0].set_facecolor("tab:orange")
             result = ttest_ind(
                 cytokine_df.loc[high_ctf, tp].dropna(),
-                cytokine_df.loc[high_tpls, tp].dropna()
+                cytokine_df.loc[high_tpls, tp].dropna(),
             )
             if result.pvalue < 0.01:
                 timepoints[index] = timepoints[index] + "**"
@@ -280,6 +238,5 @@ def makeFigure():
         ax.set_ylabel("Cytokine Expression")
 
         ax.set_title(cytokine)
-
 
     return fig

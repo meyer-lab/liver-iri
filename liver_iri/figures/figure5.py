@@ -1,13 +1,14 @@
 """Plots Figure 5 -- tPLS Model Performance"""
+
 import warnings
 
-from lifelines import KaplanMeierFitter
 import numpy as np
 import pandas as pd
+import xarray as xr
+from lifelines import KaplanMeierFitter
 from scipy.stats import pearsonr
 from sklearn.metrics import auc, roc_curve
 from sklearn.preprocessing import LabelEncoder, scale
-import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import (oversample, predict_categorical, predict_clinical,
@@ -37,7 +38,7 @@ TO_PREDICT = [
     "rsx",
     "txmeld",
     "wit",
-    "etiology"
+    "etiology",
 ]
 CONVERSIONS = {
     "abox": "Compatibility",
@@ -64,7 +65,7 @@ CONVERSIONS = {
     "rsx": "Recipient Sex",
     "txmeld": "Transplant\nMELD Score",
     "wit": "Warm\nIschemia Time",
-    "etiology": "Etiology"
+    "etiology": "Etiology",
 }
 METHODS = ["LFTs", "PV Cytokines", "Peripheral Cytokines", "tPLS"]
 
@@ -87,13 +88,9 @@ def clinical_predict(meta: pd.DataFrame, labels: pd.Series):
 
     for variable_name in TO_PREDICT:
         if variable_name == "etiology":
-            data = meta.loc[
-                :,
-                ["aih", "etoh", "hbv", "hcv", "pbc", "psc"]
-            ]
+            data = meta.loc[:, ["aih", "etoh", "hbv", "hcv", "pbc", "psc"]]
             accuracies.loc[variable_name], _, _ = predict_categorical(
-                data,
-                labels.loc[:, "graft_death"]
+                data, labels.loc[:, "graft_death"]
             )
         else:
             variable = meta.loc[:, variable_name]
@@ -104,13 +101,9 @@ def clinical_predict(meta: pd.DataFrame, labels: pd.Series):
                 variable[:] = encoder.fit_transform(variable)
 
             accuracies.loc[variable_name] = predict_clinical(
-                variable,
-                _labels.loc[:, "graft_death"]
+                variable, _labels.loc[:, "graft_death"]
             )
-            _, c_indices.loc[variable_name], _ = run_survival(
-                variable,
-                _labels
-            )
+            _, c_indices.loc[variable_name], _ = run_survival(variable, _labels)
 
     return accuracies.sort_values(), c_indices.sort_values()
 
@@ -192,8 +185,7 @@ def makeFigure():
 
     res = pearsonr(patient_factors.iloc[:, 0], patient_factors.iloc[:, 1])
     score, model = predict_continuous(
-        patient_factors.iloc[:, 0],
-        patient_factors.iloc[:, 1]
+        patient_factors.iloc[:, 0], patient_factors.iloc[:, 1]
     )
 
     cs = ax.contourf(xx, yy, probs, 11, cmap="RdBu", alpha=0.75)
@@ -238,13 +230,13 @@ def makeFigure():
         s=f"Pearson: {round(res.statistic, 2)}\np-value: {res.pvalue}",
         ha="right",
         ma="right",
-        va="bottom"
+        va="bottom",
     )
 
     xs = [-1.1, 1.1]
     ys = [
         model.params.iloc[0] + model.params.iloc[1] * xs[0],
-        model.params.iloc[0] + model.params.iloc[1] * xs[1]
+        model.params.iloc[0] + model.params.iloc[1] * xs[1],
     ]
 
     ax.plot(xs, ys, color="k", linestyle="--", zorder=3)
@@ -265,7 +257,7 @@ def makeFigure():
     cyto_factors = pd.DataFrame(
         tpls.Xs_factors[0][2],
         index=data.Cytokine.values,
-        columns=np.array([1, 2])
+        columns=np.array([1, 2]),
     )
     cyto_factors /= abs(cyto_factors).max(axis=0)
     ax.set_title("Cytokine Factors")
@@ -315,7 +307,9 @@ def makeFigure():
         columns=np.array([1, 2]),
     )
     time_factors /= abs(time_factors).max(axis=0)
-    time_factors.loc[["PV", "LF"], :] /= abs(time_factors.loc[["PV", "LF"], :]).max()
+    time_factors.loc[["PV", "LF"], :] /= abs(
+        time_factors.loc[["PV", "LF"], :]
+    ).max()
 
     ax.plot(
         [-0.1, time_factors.shape[0] - 0.9], [0, 0], linestyle="--", color="k"
@@ -353,7 +347,7 @@ def makeFigure():
     lft_factors = pd.DataFrame(
         tpls.Xs_factors[1][2],
         index=data["LFT Score"].values,
-        columns=np.array([1, 2])
+        columns=np.array([1, 2]),
     )
     lft_factors /= abs(lft_factors).max(axis=0)
 
@@ -364,7 +358,7 @@ def makeFigure():
         lft_factors.loc[:, 1],
         lft_factors.loc[:, 2],
         c=["tab:blue", "tab:orange", "tab:green"],
-        edgecolor="k"
+        edgecolor="k",
     )
 
     xticks = [round(i, 1) for i in np.arange(-1, 1.1, 0.5)]
@@ -455,7 +449,9 @@ def makeFigure():
         pv_matrix, all_labels.loc[pv_matrix.index], return_proba=True
     )
     peripheral_acc, peripheral_model, peripheral_proba = predict_categorical(
-        peripheral_matrix, all_labels.loc[peripheral_matrix.index], return_proba=True
+        peripheral_matrix,
+        all_labels.loc[peripheral_matrix.index],
+        return_proba=True,
     )
     lft_acc, lft_model, lft_proba = predict_categorical(
         lft_matrix, all_labels.loc[lft_matrix.index], return_proba=True
@@ -478,7 +474,7 @@ def makeFigure():
 
     molecular_accuracies = pd.Series(
         [tpls_acc, peripheral_acc, pv_acc, lft_acc],
-        index=["tPLS", "Peripheral Cytokines", "PV Cytokines", "LFTs"]
+        index=["tPLS", "Peripheral Cytokines", "PV Cytokines", "LFTs"],
     )
     accuracies = pd.concat([molecular_accuracies, clinical_accuracies])
     accuracies = accuracies.sort_values(ascending=False)
@@ -486,19 +482,14 @@ def makeFigure():
     colors = pd.Series("tab:blue", index=accuracies.index)
     colors.loc[molecular_accuracies.index] = "tab:orange"
 
-    ax.bar(
-        np.arange(len(accuracies)),
-        accuracies,
-        width=1,
-        color=colors
-    )
+    ax.bar(np.arange(len(accuracies)), accuracies, width=1, color=colors)
     ax.set_xticks(np.arange(len(accuracies)))
     ax.set_xticklabels(
         accuracies.index.to_series().replace(CONVERSIONS),
         ha="right",
         ma="right",
         va="top",
-        rotation=45
+        rotation=45,
     )
     ax.set_xlim([-1, len(accuracies)])
     ax.set_ylim([0, 1])
@@ -516,7 +507,7 @@ def makeFigure():
         ax.plot(
             curve[0],
             curve[1],
-            label=f"{method} (AUC: {round(auc(curve[0], curve[1]), 2)})"
+            label=f"{method} (AUC: {round(auc(curve[0], curve[1]), 2)})",
         )
 
     ax.legend()
@@ -537,8 +528,7 @@ def makeFigure():
         tensors, survival_labels, column="graft_death"
     )
     tpls.fit(
-        oversampled_tensors,
-        oversampled_labels.loc[:, "graft_death"].values
+        oversampled_tensors, oversampled_labels.loc[:, "graft_death"].values
     )
     survival_factors = pd.DataFrame(
         tpls.transform(tensors),
@@ -547,17 +537,12 @@ def makeFigure():
     )
 
     _, c_indices.loc["PV Cytokines"], _ = run_survival(
-        pv_matrix,
-        survival_labels
+        pv_matrix, survival_labels
     )
     _, c_indices.loc["Peripheral Cytokines"], _ = run_survival(
-        peripheral_matrix,
-        survival_labels
+        peripheral_matrix, survival_labels
     )
-    _, c_indices.loc["LFTs"], _ = run_survival(
-        lft_matrix,
-        survival_labels
-    )
+    _, c_indices.loc["LFTs"], _ = run_survival(lft_matrix, survival_labels)
 
     gs = axs[9].get_gridspec()
     axs[9].remove()
@@ -569,18 +554,14 @@ def makeFigure():
     ax = axs[9]
 
     c_indices = c_indices.dropna().sort_values(ascending=False)
-    ax.bar(
-        np.arange(len(c_indices)),
-        c_indices,
-        width=1
-    )
+    ax.bar(np.arange(len(c_indices)), c_indices, width=1)
     ax.set_xticks(np.arange(len(c_indices)))
     ax.set_xticklabels(
         c_indices.index.to_series().replace(CONVERSIONS),
         ha="right",
         ma="right",
         va="top",
-        rotation=45
+        rotation=45,
     )
     ax.set_xlim([-1, len(c_indices)])
     ax.set_ylim([0, 1])
@@ -606,24 +587,24 @@ def makeFigure():
     low_index = component_sum.index[30:]
     kmf.fit(
         survival_labels.loc[high_index, "survival_time"],
-        survival_labels.loc[high_index, "graft_death"]
+        survival_labels.loc[high_index, "graft_death"],
     )
     ax.plot(
         kmf.survival_function_.index,
         kmf.survival_function_.iloc[:, 0],
         label=f"High tPLS 1 + 2",
-        color="tab:blue"
+        color="tab:blue",
     )
     max_index = kmf.survival_function_.index[-1]
     kmf.fit(
         survival_labels.loc[low_index, "survival_time"],
-        survival_labels.loc[low_index, "graft_death"]
+        survival_labels.loc[low_index, "graft_death"],
     )
     ax.plot(
         kmf.survival_function_.index,
         kmf.survival_function_.iloc[:, 0],
         label=f"Low tPLS 1 + 2",
-        color="tab:orange"
+        color="tab:orange",
     )
     if kmf.survival_function_.index[-1] > max_index:
         max_index = kmf.survival_function_.index[-1]

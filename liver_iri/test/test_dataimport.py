@@ -15,9 +15,7 @@ def test_metadata_import():
     assert isinstance(meta, pd.DataFrame)
 
 
-@pytest.mark.parametrize(
-    "import_func", [cytokine_data, build_coupled_tensors]
-)
+@pytest.mark.parametrize("import_func", [cytokine_data, build_coupled_tensors])
 def test_data_imports(import_func):
     """Tests omics data import"""
     data = import_func()

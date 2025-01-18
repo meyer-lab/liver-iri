@@ -1,11 +1,12 @@
 """Plots Figure 3a -- CTF 1: Th2 Returns"""
+
 import numpy as np
 import pandas as pd
-from scipy.stats import pearsonr
 import xarray as xr
+from scipy.stats import pearsonr
 
-from .common import getSetup, plot_scatter
 from ..dataimport import build_coupled_tensors
+from .common import getSetup, plot_scatter
 
 
 def makeFigure():
@@ -18,14 +19,14 @@ def makeFigure():
         pv_scaling=1,
         no_missing=True,
         normalize=False,
-        transform="log"
+        transform="log",
     )
     raw_val = build_coupled_tensors(
         lft_scaling=1,
         pv_scaling=1,
         no_missing=False,
         normalize=False,
-        transform="log"
+        transform="log",
     )
     raw_data = xr.merge([raw_data, raw_val])
     cytokine_measurements = raw_data["Cytokine Measurements"]
@@ -34,23 +35,26 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    axs, fig = getSetup(
-        (9, 3),
-        {"nrows": 1, "ncols": 3}
-    )
+    axs, fig = getSetup((9, 3), {"nrows": 1, "ncols": 3})
 
     ############################################################################
     # IL-9 scatters
     ############################################################################
 
-    d1 = cytokine_measurements.loc[{
-        "Cytokine": "IL-9",
-        "Cytokine Timepoint": ["PO", "D1"]
-    }].squeeze().to_pandas()
-    m1 = cytokine_measurements.loc[{
-        "Cytokine": "IL-9",
-        "Cytokine Timepoint": ["PO", "M1"]
-    }].squeeze().to_pandas()
+    d1 = (
+        cytokine_measurements.loc[
+            {"Cytokine": "IL-9", "Cytokine Timepoint": ["PO", "D1"]}
+        ]
+        .squeeze()
+        .to_pandas()
+    )
+    m1 = (
+        cytokine_measurements.loc[
+            {"Cytokine": "IL-9", "Cytokine Timepoint": ["PO", "M1"]}
+        ]
+        .squeeze()
+        .to_pandas()
+    )
 
     plot_scatter(
         d1,
@@ -75,21 +79,20 @@ def makeFigure():
     th2_cytokines = cytokine_measurements.loc[
         {
             "Cytokine": ["IL-1a", "IL-4", "IL-5", "IL-9", "IL-13"],
-            "Cytokine Timepoint": ["PO", "D1", "W1", "M1"]
+            "Cytokine Timepoint": ["PO", "D1", "W1", "M1"],
         }
     ]
 
     correlations = pd.DataFrame(
         index=th2_cytokines["Cytokine"].values,
-        columns=th2_cytokines["Cytokine Timepoint"].values[1:]
+        columns=th2_cytokines["Cytokine Timepoint"].values[1:],
     )
     for cytokine in th2_cytokines["Cytokine"].values:
         df = th2_cytokines.loc[{"Cytokine": cytokine}].squeeze().to_pandas()
         df = df.dropna(axis=0)
         for tp in correlations.columns:
             correlations.loc[cytokine, tp] = pearsonr(
-                df.loc[:, "PO"],
-                df.loc[:, tp]
+                df.loc[:, "PO"], df.loc[:, tp]
             ).statistic
 
     correlations = correlations.sort_values(by="W1", ascending=False)
@@ -98,7 +101,7 @@ def makeFigure():
         ax.bar(
             np.arange(index, 4 * correlations.shape[0], 4),
             correlations.loc[:, tp],
-            width=1
+            width=1,
         )
 
     ax.set_xticks(np.arange(1, 4 * correlations.shape[0], 4))

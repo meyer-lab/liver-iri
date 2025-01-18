@@ -1,26 +1,18 @@
 """Plots Figure 6d -- tPLS Correlates"""
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .common import getSetup, plot_scatter
 from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import oversample, run_coupled_tpls_classification
 from ..tensor import convert_to_numpy
+from .common import getSetup, plot_scatter
 
 CORRELATES = {
-    "wit": {
-        "name": "Warm Ischemia Time",
-        "component": 1
-    },
-    "dage": {
-        "name": "Donor Age",
-        "component": 2
-    },
-    "dri": {
-        "name": "Donor Risk Index",
-        "component": 2
-    }
+    "wit": {"name": "Warm Ischemia Time", "component": 1},
+    "dage": {"name": "Donor Age", "component": 2},
+    "dri": {"name": "Donor Risk Index", "component": 2},
 }
 
 
@@ -46,10 +38,7 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    axs, fig = getSetup(
-        (9, 3),
-        {"nrows": 1, "ncols": 3}
-    )
+    axs, fig = getSetup((9, 3), {"nrows": 1, "ncols": 3})
 
     ############################################################################
     # Factorization
@@ -95,10 +84,7 @@ def makeFigure():
         df.columns = [f"Component {comp}", meta_name]
 
         if abbr == "cit":
-            df = df.loc[
-                df.loc[:, meta_name] < 1000,
-                :
-            ]
+            df = df.loc[df.loc[:, meta_name] < 1000, :]
 
         plot_scatter(df, ax)
 

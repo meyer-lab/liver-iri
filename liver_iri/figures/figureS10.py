@@ -1,13 +1,10 @@
 """Plots Figure S10 -- All Cytokine Errorbars"""
+
 import numpy as np
-import pandas as pd
-from scipy.stats import ttest_ind, pearsonr
-from sklearn.preprocessing import LabelEncoder
 import xarray as xr
 
+from ..dataimport import build_coupled_tensors
 from .common import getSetup
-from ..dataimport import build_coupled_tensors, import_meta
-
 
 
 def makeFigure():
@@ -16,8 +13,11 @@ def makeFigure():
     ############################################################################
 
     data = build_coupled_tensors(
-        peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False,
-        transform="log"
+        peripheral_scaling=1,
+        pv_scaling=1,
+        lft_scaling=1,
+        normalize=False,
+        transform="log",
     )
     val_data = build_coupled_tensors(
         peripheral_scaling=1,
@@ -25,7 +25,7 @@ def makeFigure():
         lft_scaling=1,
         normalize=False,
         no_missing=False,
-        transform="log"
+        transform="log",
     )
     data = xr.merge([data, val_data])
     cytokines = data["Cytokine Measurements"]
@@ -36,10 +36,7 @@ def makeFigure():
 
     axs, fig = getSetup(
         (3, 3 * len(cytokines["Cytokine"].values)),
-        {
-            "nrows": len(cytokines["Cytokine"].values),
-            "ncols": 1
-        }
+        {"nrows": len(cytokines["Cytokine"].values), "ncols": 1},
     )
 
     ############################################################################
@@ -48,17 +45,13 @@ def makeFigure():
 
     ax_index = 0
     for cytokine, ax in zip(cytokines["Cytokine"].values, axs):
-        df = cytokines.sel(
-            {
-                "Cytokine": cytokine
-            }
-        ).squeeze().to_pandas()
+        df = cytokines.sel({"Cytokine": cytokine}).squeeze().to_pandas()
         ax.errorbar(
             np.arange(df.shape[1]),
             df.mean(axis=0),
             yerr=df.std(axis=0),
             capsize=2,
-            color="black"
+            color="black",
         )
 
         ticks = list(df.columns)

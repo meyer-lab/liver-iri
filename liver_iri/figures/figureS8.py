@@ -1,14 +1,13 @@
 """Plots Figure S8 -- tPLS Parameter Tuning"""
+
 import warnings
 
 import numpy as np
 import pandas as pd
-from scipy.stats import ttest_ind
-import xarray as xr
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import oversample, run_coupled_tpls_classification
-from ..tensor import convert_to_numpy, run_coupled
+from ..predict import run_coupled_tpls_classification
+from ..tensor import convert_to_numpy
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
@@ -29,9 +28,7 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    axs, fig = getSetup(
-        (6, 6), {"ncols": 2, "nrows": 2}
-    )
+    axs, fig = getSetup((6, 6), {"ncols": 2, "nrows": 2})
 
     ############################################################################
     # Rank evaluation
@@ -46,10 +43,7 @@ def makeFigure():
         )
         accuracies.loc[rank] = tpls_acc
 
-    ax.plot(
-        ranks,
-        accuracies
-    )
+    ax.plot(ranks, accuracies)
     ax.set_ylim([0, 1])
     ax.set_xlabel("Rank")
     ax.set_ylabel("Balanced Accuracy")
@@ -65,14 +59,13 @@ def makeFigure():
         "lft_scaling": 1,
         "transform": "power",
         "no_missing": True,
-        "normalize": True
+        "normalize": True,
     }
     labels = meta.loc[:, "graft_death"]
     labels = labels.dropna()
 
     for ax, dataset in zip(
-        axs[1:],
-        ["pv_scaling", "lft_scaling", "peripheral_scaling"]
+        axs[1:], ["pv_scaling", "lft_scaling", "peripheral_scaling"]
     ):
         accuracies = pd.Series(0, index=scalings, dtype=float)
         for scaling in scalings:
@@ -85,10 +78,7 @@ def makeFigure():
             )
             accuracies.loc[scaling] = tpls_acc
 
-        ax.semilogx(
-            scalings,
-            accuracies
-        )
+        ax.semilogx(scalings, accuracies)
         ax.set_xticks(scalings)
         ax.set_ylim([0, 1])
         ax.set_xlabel(f"{dataset} Scaling")
