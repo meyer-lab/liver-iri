@@ -11,12 +11,10 @@ from .common import getSetup
 
 
 def makeFigure():
-    # Figure setup
-    axs, fig = getSetup(
-        (5, 2), {"ncols": 4, "nrows": 1, "width_ratios": [1, 10, 10, 10]}
-    )
-
+    ############################################################################
     # Data imports
+    ############################################################################
+
     data = build_coupled_tensors(
         peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False
     )
@@ -38,20 +36,32 @@ def makeFigure():
     for column in meta.columns:
         meta.loc[:, column] = le.fit_transform(meta.loc[:, column])
 
-    cytokines = (
-        data["Cytokine Measurements"]
-        .stack(Flattened=["Cytokine Timepoint", "Cytokine"])
-        .to_pandas()
-    )
-    lfts = (
-        data["LFT Measurements"]
-        .stack(Flattened=["LFT Timepoint", "LFT Score"])
-        .to_pandas()
+    ############################################################################
+    # Figure setup
+    ############################################################################
+
+    axs, fig = getSetup(
+        (5, 2), {"ncols": 4, "nrows": 1, "width_ratios": [1, 10, 10, 10]}
     )
 
-    merged = pd.concat([cytokines, lfts], axis=1)
+    ############################################################################
+    # Data flattening
+    ############################################################################
+
+    cytokines = data["Cytokine Measurements"].stack(
+        Flattened=["Cytokine Timepoint", "Cytokine"]
+    ).to_pandas()
+    lfts = data["LFT Measurements"].stack(
+        Flattened=["LFT Timepoint", "LFT Score"]
+    ).to_pandas()
+
+    merged = pd.concat([cytokines, lfts], axis=1)  # type: ignore
     missing = np.isnan(merged)
     merged = reorder_table(merged.fillna(-1), plot_ax=axs[1])
+
+    ############################################################################
+    # Dataset heatmaps
+    ############################################################################
 
     axs[1].set_xticks([])
     axs[1].set_yticks([])

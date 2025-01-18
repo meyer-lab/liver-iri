@@ -28,7 +28,7 @@ def makeFigure():
     _, cp = run_coupled(data)
     factors = {}
     for mode in cp.modes:
-        if "Timepoint" not in mode:
+        if "Timepoint" not in str(mode):
             factors[mode] = cp.x[f"_{mode}"].to_pandas()
 
     ############################################################################
@@ -71,6 +71,7 @@ def makeFigure():
 
     le = LabelEncoder()
     labels.loc[:, "etiology"] = le.fit_transform(labels.loc[:, "etiol"])
+    assert le.classes_ is not None
     labels = labels.sort_values(by=["graft_death", "liri", "etiol"])
 
     liri_cmap = LinearSegmentedColormap.from_list(
@@ -113,7 +114,7 @@ def makeFigure():
     ]
     for i in range(len(le.classes_)):
         legend_elements.append(Patch(facecolor=colors[i]))
-        legend_names.append(le.classes_[i])
+        legend_names.append(str(le.classes_[i]))
 
     ############################################################################
     # Meta-data heatmaps

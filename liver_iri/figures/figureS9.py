@@ -42,6 +42,10 @@ def makeFigure():
         transform="log"
     )
 
+    ############################################################################
+    # Factorization
+    ############################################################################
+
     _, cp = run_coupled(cp_data, rank=4)
     tensors, labels = convert_to_numpy(tpls_data, labels)
     cp_tensors, all_labels = convert_to_numpy(tpls_data, all_labels)
@@ -63,7 +67,7 @@ def makeFigure():
     }
     tpls_factors = {
         "Patient": pd.Series(
-            tpls.transform(cp_tensors)[:, 1],
+            tpls.transform(cp_tensors)[:, 1],  # type: ignore
             index=all_labels.index
         ),
         "Cytokine": tpls.Xs_factors[0][2][:, 1],
@@ -71,6 +75,10 @@ def makeFigure():
         "LFT": tpls.Xs_factors[1][2][:, 1],
         "LFT Timepoint": tpls.Xs_factors[1][1][:, 1]
     }
+
+    ############################################################################
+    # Figure setup
+    ############################################################################
 
     axs, fig = getSetup(
         (9, 9),
@@ -136,7 +144,7 @@ def makeFigure():
         ax.set_ylim([-1.1, 1.1])
 
     ############################################################################
-    # Cytokine / LFTs
+    # Cytokine / LFTs plotting
     ############################################################################
 
     for ax, dimension in zip(axs[2:4], ["Cytokine", "LFT"]):
@@ -174,6 +182,10 @@ def makeFigure():
         ax.set_ylabel("CTF")
         ax.set_title(dimension)
 
+    ############################################################################
+    # Timepoint plotting
+    ############################################################################
+
     for ax, dimension in zip(axs[4:], ["Cytokine Timepoint", "LFT Timepoint"]):
         tpls_factor = tpls_factors[dimension]
         ctf_factor = ctf_factors[dimension]
@@ -209,6 +221,10 @@ def makeFigure():
 
         ax.legend()
         ax.set_title(dimension)
+
+    ############################################################################
+    # Eotaxin, EGF, and TGFa plotting
+    ############################################################################
 
     cytokine_measurements = raw_data["Cytokine Measurements"]
     high_tpls = factor_diff.index[-30:]

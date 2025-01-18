@@ -38,13 +38,17 @@ def makeFigure():
     )
 
     ############################################################################
-    # Factorization
+    # Figure setup
     ############################################################################
 
     axs, fig = getSetup(
         (8, 4),
         {"nrows": 1, "ncols": 3}
     )
+
+    ############################################################################
+    # Base factors
+    ############################################################################
 
     lft_scores = pd.DataFrame(
         index=np.arange(N_TRIALS) + 1,
@@ -53,10 +57,14 @@ def makeFigure():
     )
     cyto_scores = lft_scores.copy(deep=True)
     r2xs = pd.DataFrame(
-        index=["CTF"],
+        index=np.array(["CTF"]),
         columns=np.arange(RANKS) + 1,
         dtype=float
     )
+
+    ############################################################################
+    # Generate resampled factors
+    ############################################################################
 
     for rank in tqdm(np.arange(RANKS) + 1):
         _, cp = run_coupled(data, rank=rank)
@@ -90,6 +98,10 @@ def makeFigure():
             lft_scores.loc[trial, rank] = lft_score
             cyto_scores.loc[trial, rank] = cyto_score
 
+    ############################################################################
+    # Plot FMS
+    ############################################################################
+
     for ax, score_df in zip(axs, [lft_scores, cyto_scores]):
         mean = score_df.mean(axis=0)
         dev = score_df.std(axis=0)
@@ -113,21 +125,19 @@ def makeFigure():
     axs[1].set_title("Cytokines")
 
     ############################################################################
-    # R2X Plots
+    # R2X plots
     ############################################################################
 
     flattened = data["Cytokine Measurements"].stack(
         merged=("Cytokine", "Cytokine Timepoint")
     ).to_pandas()
-    flattened = pd.concat([
-        flattened,
-        data["LFT Measurements"].stack(
-            merged=("LFT Score", "LFT Timepoint")
-        ).to_pandas()],
-        axis=1
-    )
+    lfts = data["LFT Measurements"].stack(
+        merged=("LFT Score", "LFT Timepoint")
+    ).to_pandas()
+    flattened = pd.concat([flattened, lfts], axis=1)  # type: ignore
 
     pca = PCA(flattened, missing="fill-em", ncomp=5)
+    assert pca.rsquare is not None
     r2xs.loc["PCA", :] = pca.rsquare.iloc[1:].values
     ax = axs[2]
     for line in r2xs.index:

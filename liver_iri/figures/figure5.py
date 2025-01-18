@@ -137,7 +137,7 @@ def makeFigure():
     data = build_coupled_tensors()
     val_data = build_coupled_tensors(no_missing=False)
     all_data = xr.merge([data, val_data])
-    all_labels = pd.concat([labels, val_labels])
+    all_labels = pd.Series(pd.concat([labels, val_labels]))
 
     cytokine_measurements = data["Cytokine Measurements"]
     lft_measurements = data["LFT Measurements"]
@@ -146,6 +146,10 @@ def makeFigure():
     oversampled_tensors, oversampled_labels = oversample(tensors, labels)
     all_tensors, all_labels = convert_to_numpy(all_data, all_labels)
     survival_labels = meta.loc[:, ["graft_death", "survival_time"]]
+
+    ############################################################################
+    # Model fitting
+    ############################################################################
 
     clinical_accuracies, c_indices = clinical_predict(meta, survival_labels)
     (tpls, lr_model), tpls_acc, tpls_proba = run_coupled_tpls_classification(
@@ -259,7 +263,9 @@ def makeFigure():
     ax = axs[1]
 
     cyto_factors = pd.DataFrame(
-        tpls.Xs_factors[0][2], index=data.Cytokine.values, columns=[1, 2]
+        tpls.Xs_factors[0][2],
+        index=data.Cytokine.values,
+        columns=np.array([1, 2])
     )
     cyto_factors /= abs(cyto_factors).max(axis=0)
     ax.set_title("Cytokine Factors")
@@ -306,7 +312,7 @@ def makeFigure():
     time_factors = pd.DataFrame(
         tpls.Xs_factors[0][1],
         index=data["Cytokine Timepoint"].values,
-        columns=[1, 2],
+        columns=np.array([1, 2]),
     )
     time_factors /= abs(time_factors).max(axis=0)
     time_factors.loc[["PV", "LF"], :] /= abs(time_factors.loc[["PV", "LF"], :]).max()
@@ -345,7 +351,9 @@ def makeFigure():
     ax = axs[3]
 
     lft_factors = pd.DataFrame(
-        tpls.Xs_factors[1][2], index=data["LFT Score"].values, columns=[1, 2]
+        tpls.Xs_factors[1][2],
+        index=data["LFT Score"].values,
+        columns=np.array([1, 2])
     )
     lft_factors /= abs(lft_factors).max(axis=0)
 
@@ -379,7 +387,7 @@ def makeFigure():
     time_factors = pd.DataFrame(
         tpls.Xs_factors[1][1],
         index=data["LFT Timepoint"].values,
-        columns=[1, 2],
+        columns=np.array([1, 2]),
     )
     time_factors /= abs(time_factors).max(axis=0)
     index = list(time_factors.index)

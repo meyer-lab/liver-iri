@@ -36,7 +36,7 @@ def makeFigure():
     val_data = build_coupled_tensors(no_missing=False)
 
     all_data = xr.merge([data, val_data])
-    all_labels = pd.concat([labels, val_labels])
+    all_labels = pd.Series(pd.concat([labels, val_labels]))
     all_tensors, all_labels = convert_to_numpy(all_data, all_labels)
 
     raw_data = build_coupled_tensors(
@@ -56,6 +56,10 @@ def makeFigure():
 
     cytokine_measurements = raw_data["Cytokine Measurements"]
 
+    ############################################################################
+    # Factorization
+    ############################################################################
+
     tensors, labels = convert_to_numpy(data, labels)
     oversampled_tensors, oversampled_labels = oversample(tensors, labels)
 
@@ -65,7 +69,7 @@ def makeFigure():
     tpls.fit(oversampled_tensors, oversampled_labels.values)
 
     ############################################################################
-    # tPLS Patients
+    # tPLS patients
     ############################################################################
 
     factor = tpls.transform(all_tensors)
@@ -83,6 +87,10 @@ def makeFigure():
         {"ncols": n_axs, "nrows": 1}
     )
     ax_index = 0
+
+    ############################################################################
+    # Component boxplots
+    ############################################################################
 
     for component, cytokines in CYTOKINES.items():
         patient_factors = patient_factors.sort_values(

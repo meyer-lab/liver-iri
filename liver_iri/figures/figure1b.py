@@ -15,7 +15,10 @@ DIFFERENCES = [
 
 
 def makeFigure():
+    ############################################################################
     # Data imports
+    ############################################################################
+
     meta = import_meta(long_survival=False)
     val_meta = import_meta(no_missing=False, long_survival=False)
     meta = pd.concat([meta, val_meta])
@@ -35,7 +38,10 @@ def makeFigure():
     data = xr.merge([data, val_data])
     cytokines = data["Cytokine Measurements"]
 
+    ############################################################################
     # Figure setup
+    ############################################################################
+
     axs, fig = getSetup(
         (3 * len(DIFFERENCES), 3 * len(cytokines["Cytokine"].values)),
         {
@@ -43,6 +49,10 @@ def makeFigure():
             "ncols": len(DIFFERENCES)
         }
     )
+
+    ############################################################################
+    # Cytokine binary variable comparions
+    ############################################################################
 
     ax_index = 0
     le = LabelEncoder()
@@ -58,6 +68,9 @@ def makeFigure():
             meta_col = meta.loc[:, to_diff].dropna()
             meta_col[:] = le.fit_transform(meta_col)
             _df = df.loc[meta_col.index, :]
+
+            if le.classes_ is None:
+                continue
 
             ax.errorbar(
                 np.arange(_df.shape[1]) + 0.1,

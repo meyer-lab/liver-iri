@@ -11,6 +11,10 @@ from ..dataimport import build_coupled_tensors, import_meta
 
 
 def makeFigure():
+    ############################################################################
+    # Data imports
+    ############################################################################
+
     data = build_coupled_tensors(
         peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False,
         transform="log"
@@ -26,6 +30,10 @@ def makeFigure():
     data = xr.merge([data, val_data])
     cytokines = data["Cytokine Measurements"]
 
+    ############################################################################
+    # Figure setup
+    ############################################################################
+
     axs, fig = getSetup(
         (3, 3 * len(cytokines["Cytokine"].values)),
         {
@@ -33,6 +41,10 @@ def makeFigure():
             "ncols": 1
         }
     )
+
+    ############################################################################
+    # Cytokine errorbar plotting
+    ############################################################################
 
     ax_index = 0
     for cytokine, ax in zip(cytokines["Cytokine"].values, axs):

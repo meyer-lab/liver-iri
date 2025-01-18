@@ -62,7 +62,10 @@ def makeFigure():
     default_scalings = {
         "pv_scaling": 1,
         "peripheral_scaling": 1,
-        "lft_scaling": 1
+        "lft_scaling": 1,
+        "transform": "power",
+        "no_missing": True,
+        "normalize": True
     }
     labels = meta.loc[:, "graft_death"]
     labels = labels.dropna()

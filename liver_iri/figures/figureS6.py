@@ -10,22 +10,22 @@ from .common import getSetup
 from ..dataimport import build_coupled_tensors, import_meta
 
 COLORS = ["tab:blue", "tab:orange"]
-CONTINUOUS = [
+CONTINUOUS = np.array([
     "dage", "rag", "dbmi", "dtbili", "dalt", "cit", "wit", "listmeld",
     "txmeld", "liri", "dri"
-]
-CATEGORICAL = [
+])
+CATEGORICAL = np.array([
     "dsx", "rsx", "etoh", "hcv", "nash", "hcc", "psens", "esens", "lsens"
-]
-BINNED = [
+])
+BINNED = np.array([
     "clscores", "bnscores", "postinf", "postnec", "poststeat",
     "postcong", "postbal"
-]
+])
 
 
 def makeFigure():
     ############################################################################
-    # Data Import
+    # Data imports
     ############################################################################
 
     meta = import_meta(long_survival=False)
@@ -35,7 +35,7 @@ def makeFigure():
     CATEGORICAL.extend(BINNED)
 
     ############################################################################
-    # Pearson Correlations
+    # Pearson correlations
     ############################################################################
 
     correlations = pd.DataFrame(
@@ -62,7 +62,7 @@ def makeFigure():
             corr_p.loc[variable_1, variable_2] = result.pvalue
 
     ############################################################################
-    # T-Tests
+    # T-tests
     ############################################################################
 
     t_tests = pd.DataFrame(
@@ -92,7 +92,7 @@ def makeFigure():
             t_p.loc[variable_1, variable_2] = result.pvalue
 
     ############################################################################
-    # Chi-Square
+    # Fisher's exact tests
     ############################################################################
 
     fe_tests = pd.DataFrame(
@@ -132,7 +132,7 @@ def makeFigure():
             fe_p.loc[variable_1, variable_2] = result.pvalue
 
     ############################################################################
-    # Plotting
+    # Heatmap plotting
     ############################################################################
 
     axs, fig = getSetup(

@@ -11,23 +11,23 @@ from ..dataimport import build_coupled_tensors, import_meta
 from ..tensor import run_coupled
 
 COLORS = ["tab:blue", "tab:orange"]
-CONTINUOUS = [
+CONTINUOUS = np.array([
     "dage", "rag", "dbmi", "dtbili", "dalt", "cit", "wit", "listmeld",
     "txmeld", "liri", "dri"
-]
-CATEGORICAL = [
+])
+CATEGORICAL = np.array([
     "dsx", "rsx", "etoh", "hcv", "nash", "hcc", "psens", "esens", "lsens",
     "iri"
-]
-BINNED = [
+])
+BINNED = np.array([
     "clscores", "bnscores", "postinf", "postnec", "poststeat",
     "postcong", "postbal"
-]
+])
 
 
 def makeFigure():
     ############################################################################
-    # Factorization
+    # Data imports
     ############################################################################
 
     data = build_coupled_tensors(
@@ -52,10 +52,6 @@ def makeFigure():
     meta = pd.concat([meta, val_meta])
     meta = meta.loc[cytokines.index]
 
-    ############################################################################
-    # Pearson Correlations
-    ############################################################################
-
     correlations = pd.DataFrame(
         index=CONTINUOUS,
         columns=cytokines.columns,
@@ -67,6 +63,19 @@ def makeFigure():
         dtype=float
     )
     t_p = t_tests.copy(deep=True)
+
+    ############################################################################
+    # Figure setup
+    ############################################################################
+
+    axs, fig = getSetup(
+        (8, 8),
+        {"nrows": 4, "ncols": 3}
+    )
+
+    ############################################################################
+    # Pearson correlations
+    ############################################################################
 
     for cytokine in cytokines.columns:
         for meta_var in CONTINUOUS:
@@ -86,7 +95,7 @@ def makeFigure():
             corr_p.loc[meta_var, cytokine] = result.pvalue
 
     ############################################################################
-    # T-Tests
+    # T-tests
     ############################################################################
 
     meta.loc[:, BINNED] = (meta.loc[:, BINNED] > 1).astype(int)
@@ -107,14 +116,9 @@ def makeFigure():
         t_p.loc[meta_var, :] = result.pvalue
 
     ############################################################################
-    # Plotting
+    # Heatmap plotting
     ############################################################################
 
-    axs, fig = getSetup(
-        (8, 8),
-        {"nrows": 4, "ncols": 3}
-    )
-    ax_index = 0
     for ax_row, (stat, label, p_values) in enumerate(zip(
         [t_tests, correlations],
         ["T-Test", "Pearson Correlation"],

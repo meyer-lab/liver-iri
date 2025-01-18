@@ -25,7 +25,7 @@ CTF_CORRELATES = {
 
 def makeFigure():
     ############################################################################
-    # Factorization
+    # Data import
     ############################################################################
 
     data = build_coupled_tensors(
@@ -34,6 +34,10 @@ def makeFigure():
         lft_scaling=1,
         no_missing=True
     )
+
+    ############################################################################
+    # Factorization
+    ############################################################################
 
     _, cp = run_coupled(data)
     patient_factor = cp.x["_Patient"].to_pandas()

@@ -26,12 +26,20 @@ def makeFigure():
     _, cp = run_coupled(data, rank=4)
     factors = {}
     for mode in cp.modes:
-        if "Timepoint" in mode:
+        if "Timepoint" in str(mode):
             factors[mode] = cp.x[f"_{mode}"].to_pandas()
+
+    ############################################################################
+    # Figure setup
+    ############################################################################
 
     axs, fig = getSetup(
         (len(factors) * 3, 3), {"nrows": 1, "ncols": len(factors)}
     )
+
+    ############################################################################
+    # Plot timepoint associations
+    ############################################################################
 
     for ax, (name, df) in zip(axs, factors.items()):
         for component in df.columns:

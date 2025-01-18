@@ -12,10 +12,9 @@ from .common import getSetup
 
 
 def makeFigure():
-    axs, fig = getSetup(
-        (9, 3),
-        {"ncols": 3, "nrows": 1}
-    )
+    ############################################################################
+    # Data imports
+    ############################################################################
 
     data = build_coupled_tensors(
         peripheral_scaling=1, pv_scaling=1, lft_scaling=1, normalize=False,
@@ -32,14 +31,18 @@ def makeFigure():
     data = xr.merge([data, val_data])
     data = data.drop_sel({"Patient": [34]})
 
-    meta = import_meta(long_survival=False)
-    val_meta = import_meta(long_survival=False, no_missing=False)
-    meta = pd.concat([meta, val_meta])
-    meta = meta.loc[:, ["etiol", "iri", "graft_death"]]
+    ############################################################################
+    # Figure setup
+    ############################################################################
 
-    le = LabelEncoder()
-    for column in meta.columns:
-        meta.loc[:, column] = le.fit_transform(meta.loc[:, column])
+    axs, fig = getSetup(
+        (9, 3),
+        {"ncols": 3, "nrows": 1}
+    )
+
+    ############################################################################
+    # Threshold LFTs
+    ############################################################################
 
     lfts = data["LFT Measurements"]
     thresholds = pd.Series(
@@ -52,6 +55,10 @@ def makeFigure():
         index=lfts.Patient.values,
         columns=lfts["LFT Score"].values
     )
+
+    ############################################################################
+    # Plot LFTs by timecourse
+    ############################################################################
 
     for score, ax in zip(lfts["LFT Score"].values, axs):
         score_array = lfts.sel(
@@ -114,8 +121,5 @@ def makeFigure():
         )
         ax.legend()
         ax.set_xlim([-0.5, 7.5])
-
-    types.to_csv("lft_types.csv")
-    print()
 
     return fig

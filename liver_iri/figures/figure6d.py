@@ -26,7 +26,7 @@ CORRELATES = {
 
 def makeFigure():
     ############################################################################
-    # Factorization
+    # Data imports
     ############################################################################
 
     meta = import_meta()
@@ -39,8 +39,21 @@ def makeFigure():
     val_data = build_coupled_tensors(no_missing=False)
 
     all_data = xr.merge([data, val_data])
-    all_labels = pd.concat([labels, val_labels])
+    all_labels = pd.Series(pd.concat([labels, val_labels]))
     all_tensors, all_labels = convert_to_numpy(all_data, all_labels)
+
+    ############################################################################
+    # Figure setup
+    ############################################################################
+
+    axs, fig = getSetup(
+        (9, 3),
+        {"nrows": 1, "ncols": 3}
+    )
+
+    ############################################################################
+    # Factorization
+    ############################################################################
 
     tensors, labels = convert_to_numpy(data, labels)
     oversampled_tensors, oversampled_labels = oversample(tensors, labels)
@@ -49,6 +62,10 @@ def makeFigure():
         tensors, labels, return_proba=True
     )
     tpls.fit(oversampled_tensors, oversampled_labels.values)
+
+    ############################################################################
+    # tPLS patients
+    ############################################################################
 
     factor = tpls.transform(all_tensors)
     patient_factor = pd.DataFrame(
@@ -61,11 +78,6 @@ def makeFigure():
 
     meta = pd.concat([meta, val_meta])
     meta = meta.loc[patient_factor.index, :]
-
-    axs, fig = getSetup(
-        (9, 3),
-        {"nrows": 1, "ncols": 3}
-    )
 
     ############################################################################
     # Correlation plots
