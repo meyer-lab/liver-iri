@@ -106,7 +106,7 @@ def makeFigure():
     ############################################################################
 
     meta.loc[:, BINNED] = (meta.loc[:, BINNED] > 1).astype(int)
-    CATEGORICAL.extend(BINNED)
+    np.append(CATEGORICAL, BINNED)
     le = LabelEncoder()
     for meta_var in CATEGORICAL:
         meta_col = meta.loc[:, meta_var].dropna()
