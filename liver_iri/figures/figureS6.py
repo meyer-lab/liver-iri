@@ -50,7 +50,7 @@ def makeFigure():
     val_meta = import_meta(no_missing=False, long_survival=False)
     meta = pd.concat([meta, val_meta])
     meta.loc[:, BINNED] = (meta.loc[:, BINNED] > 1).astype(int)
-    CATEGORICAL.extend(BINNED)
+    np.append(CATEGORICAL, BINNED)
 
     ############################################################################
     # Pearson correlations
