@@ -7,10 +7,17 @@ import pandas as pd
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import LabelEncoder
 
-from ..dataimport import (build_coupled_tensors, cytokine_data, import_meta,
-                          lft_data)
-from ..predict import (predict_categorical, predict_continuous,
-                       run_coupled_tpls_classification)
+from ..dataimport import (
+    build_coupled_tensors,
+    cytokine_data,
+    import_meta,
+    lft_data,
+)
+from ..predict import (
+    predict_categorical,
+    predict_continuous,
+    run_coupled_tpls_classification,
+)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 

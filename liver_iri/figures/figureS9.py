@@ -64,7 +64,7 @@ def makeFigure():
     }
     tpls_factors = {
         "Patient": pd.Series(
-            tpls.transform(cp_tensors)[:, 1],  # noqa
+            tpls.transform(cp_tensors)[:, 1],  # type: ignore # noqa
             index=all_labels.index,
         ),
         "Cytokine": tpls.Xs_factors[0][2][:, 1],

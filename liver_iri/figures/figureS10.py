@@ -43,11 +43,7 @@ def makeFigure():
     # Cytokine errorbar plotting
     ############################################################################
 
-    for cytokine, ax in zip(
-        cytokines["Cytokine"].values,
-        axs,
-        strict=False
-    ):
+    for cytokine, ax in zip(cytokines["Cytokine"].values, axs, strict=False):
         df = cytokines.sel({"Cytokine": cytokine}).squeeze().to_pandas()
         ax.errorbar(
             np.arange(df.shape[1]),

@@ -10,9 +10,13 @@ from sklearn.metrics import roc_curve
 from sklearn.preprocessing import scale
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import (oversample, predict_categorical,
-                       run_coupled_tpls_classification, run_survival,
-                       run_tpls_survival)
+from ..predict import (
+    oversample,
+    predict_categorical,
+    run_coupled_tpls_classification,
+    run_survival,
+    run_tpls_survival,
+)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 

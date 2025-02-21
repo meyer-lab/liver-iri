@@ -3,8 +3,12 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from ..dataimport import (build_coupled_tensors, cytokine_data, import_meta,
-                          transform_data)
+from ..dataimport import (
+    build_coupled_tensors,
+    cytokine_data,
+    import_meta,
+    transform_data,
+)
 
 TEST_DATA = pd.DataFrame(np.random.random((100, 10)))
 
@@ -31,7 +35,7 @@ def test_incorrect_transforms():
 @pytest.mark.parametrize(
     "transform", ["log", "power", "reciprocal", "LOG", "LoG", "Log", None]
 )
-def test_correct_transforms(transform):  # noqa
+def test_correct_transforms(transform):  # type: ignore # noqa
     """Tests accepted data transform parameters"""
     data = transform_data(TEST_DATA)
     assert isinstance(data, pd.DataFrame)

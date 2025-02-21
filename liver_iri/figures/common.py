@@ -45,15 +45,15 @@ matplotlib.rcParams["ytick.minor.pad"] = 0.9
 
 
 def getSetup(
-    figsize: tuple[int | int],
-    gridd: dict[str | Any],
-    multz: dict[int | int] | None = None,
+    figsize: tuple[int, int],
+    gridd: dict[str, Any],
+    multz: dict[int, int] | None = None,
     empts: Iterable[int] | None = None,
     style: str = "whitegrid",
 ):
     """Establish figure set-up with subplots."""
     sns.set(
-        style=style,  # noqa
+        style=style,  # type: ignore # noqa
         font_scale=0.7,
         color_codes=True,
         palette="colorblind",
@@ -95,10 +95,10 @@ def genFigure():
     nameOut = "figure" + sys.argv[1]
 
     exec(
-        "from liver_iri.figures." + nameOut + " import makeFigure",  # noqa
+        "from liver_iri.figures." + nameOut + " import makeFigure",  # type: ignore # noqa
         globals(),
     )
-    ff = makeFigure()  # noqa
+    ff = makeFigure()  # type: ignore # noqa
     ff.savefig(
         fdir + nameOut + ".svg", dpi=300, bbox_inches="tight", pad_inches=0
     )
@@ -144,8 +144,8 @@ def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series | None = None):
     ]
 
     ax.plot(xs, ys, color="k", linestyle="--")
-    ax.set_xlabel(df.columns[0])  # noqa
-    ax.set_ylabel(df.columns[1])  # noqa
+    ax.set_xlabel(df.columns[0])  # type: ignore # noqa
+    ax.set_ylabel(df.columns[1])  # type: ignore # noqa
 
     ax.text(
         0.98,

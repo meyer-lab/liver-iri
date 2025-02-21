@@ -331,7 +331,7 @@ def predict_categorical(
         test_data = data.iloc[test_index, :]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(  # noqa
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore # noqa
                 train_data, train_labels
             )
 
@@ -382,7 +382,7 @@ def predict_clinical(
         test_data = data.iloc[test_index]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(  # noqa
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore # noqa
                 train_data.to_numpy().reshape(-1, 1), train_labels
             )
 

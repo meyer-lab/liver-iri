@@ -108,7 +108,7 @@ def makeFigure():
         .stack(merged=("LFT Score", "LFT Timepoint"))
         .to_pandas()
     )
-    flattened = pd.concat([flattened, lfts], axis=1)  # noqa
+    flattened = pd.concat([flattened, lfts], axis=1)  # type: ignore # noqa
 
     pca = PCA(flattened, missing="fill-em", ncomp=5)
     assert pca.rsquare is not None

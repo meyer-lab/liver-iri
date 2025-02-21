@@ -11,9 +11,15 @@ from sklearn.metrics import auc, roc_curve
 from sklearn.preprocessing import LabelEncoder, scale
 
 from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import (oversample, predict_categorical, predict_clinical,
-                       predict_continuous, run_coupled_tpls_classification,
-                       run_survival, run_tpls_survival)
+from ..predict import (
+    oversample,
+    predict_categorical,
+    predict_clinical,
+    predict_continuous,
+    run_coupled_tpls_classification,
+    run_survival,
+    run_tpls_survival,
+)
 from ..tensor import convert_to_numpy
 from .common import getSetup
 
