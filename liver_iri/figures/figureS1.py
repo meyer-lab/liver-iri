@@ -32,7 +32,7 @@ def makeFigure():
     # IL-4 heatmap
     ############################################################################
 
-    for ax, d_type in zip(axs, data.data_vars):
+    for ax, d_type in zip(axs, data.data_vars, strict=False):
         data_set = data[d_type]
         missingness = pd.DataFrame(
             0,

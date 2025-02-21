@@ -31,7 +31,7 @@ def test_incorrect_transforms():
 @pytest.mark.parametrize(
     "transform", ["log", "power", "reciprocal", "LOG", "LoG", "Log", None]
 )
-def test_correct_transforms(transform):
+def test_correct_transforms(transform):  # noqa
     """Tests accepted data transform parameters"""
     data = transform_data(TEST_DATA)
     assert isinstance(data, pd.DataFrame)

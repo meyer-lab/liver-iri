@@ -61,7 +61,7 @@ def makeFigure():
     )
     corr_p = correlations.copy(deep=True)
     for index_1, variable_1 in enumerate(CONTINUOUS):
-        for index_2, variable_2 in enumerate(CONTINUOUS[index_1 + 1 :]):
+        for variable_2 in CONTINUOUS[index_1 + 1 :]:
             concatenated = pd.concat(
                 [meta.loc[:, variable_1], meta.loc[:, variable_2]], axis=1
             )
@@ -77,8 +77,8 @@ def makeFigure():
     t_tests = pd.DataFrame(index=CONTINUOUS, columns=CATEGORICAL, dtype=float)
     t_p = t_tests.copy(deep=True)
     le = LabelEncoder()
-    for index_1, variable_1 in enumerate(CONTINUOUS):
-        for index_2, variable_2 in enumerate(CATEGORICAL):
+    for variable_1 in CONTINUOUS:
+        for variable_2 in CATEGORICAL:
             concatenated = pd.concat(
                 [meta.loc[:, variable_1], meta.loc[:, variable_2]], axis=1
             )
@@ -100,7 +100,7 @@ def makeFigure():
     fe_p = fe_tests.copy(deep=True)
     le = LabelEncoder()
     for index_1, variable_1 in enumerate(CATEGORICAL):
-        for index_2, variable_2 in enumerate(CATEGORICAL[index_1 + 1 :]):
+        for variable_2 in CATEGORICAL[index_1 + 1 :]:
             concatenated = pd.concat(
                 [meta.loc[:, variable_1], meta.loc[:, variable_2]], axis=1
             )
@@ -134,6 +134,7 @@ def makeFigure():
         [t_tests, fe_tests, correlations],
         ["T-Test", "Fisher Exact", "Pearson Correlation"],
         [t_p, fe_p, corr_p],
+        strict=False,
     ):
         stat = stat.T
         p_values = p_values.T

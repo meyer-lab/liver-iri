@@ -131,6 +131,7 @@ def makeFigure():
             [t_tests, correlations],
             ["T-Test", "Pearson Correlation"],
             [t_p, corr_p],
+            strict=False,
         )
     ):
         v_max = abs(stat).max().max()

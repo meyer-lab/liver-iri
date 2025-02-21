@@ -503,7 +503,7 @@ def makeFigure():
     ]
     ax.plot([0, 1], [0, 1], color="k", linestyle="--")
 
-    for curve, method in zip(curves, METHODS):
+    for curve, method in zip(curves, METHODS, strict=False):
         ax.plot(
             curve[0],
             curve[1],
@@ -592,7 +592,7 @@ def makeFigure():
     ax.plot(
         kmf.survival_function_.index,
         kmf.survival_function_.iloc[:, 0],
-        label=f"High tPLS 1 + 2",
+        label="High tPLS 1 + 2",
         color="tab:blue",
     )
     max_index = kmf.survival_function_.index[-1]
@@ -603,7 +603,7 @@ def makeFigure():
     ax.plot(
         kmf.survival_function_.index,
         kmf.survival_function_.iloc[:, 0],
-        label=f"Low tPLS 1 + 2",
+        label="Low tPLS 1 + 2",
         color="tab:orange",
     )
     if kmf.survival_function_.index[-1] > max_index:

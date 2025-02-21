@@ -1,5 +1,4 @@
 from os.path import abspath, dirname, join
-from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -176,9 +175,9 @@ def lft_data(
 
 def build_coupled_tensors(
     transform: str = "power",
-    peripheral_scaling: Union[float, int] = 1e2,
-    pv_scaling: Union[float, int] = 1,
-    lft_scaling: Union[float, int] = 1,
+    peripheral_scaling: float | int = 1e2,
+    pv_scaling: float | int = 1,
+    lft_scaling: float | int = 1,
     no_missing: bool = True,
     normalize: bool = True,
 ):

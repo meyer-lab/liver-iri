@@ -38,7 +38,7 @@ def makeFigure():
     # Plot timepoint associations
     ############################################################################
 
-    for ax, (name, df) in zip(axs, factors.items()):
+    for ax, (name, df) in zip(axs, factors.items(), strict=False):
         for component in df.columns:
             ax.plot(
                 np.arange(df.shape[0]),

@@ -1,15 +1,13 @@
 """Plots Figure 3d -- Granulocyte / LFT Association"""
 
 import warnings
-from decimal import Decimal
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 from scipy.stats import pearsonr
 
-from ..dataimport import build_coupled_tensors, import_meta
-from ..predict import predict_continuous
+from ..dataimport import build_coupled_tensors
 from .common import getSetup
 
 warnings.filterwarnings("ignore")

@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from lifelines import KaplanMeierFitter
-from lifelines.utils import concordance_index
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import scale
 
@@ -122,7 +121,7 @@ def makeFigure():
     ]
     ax.plot([0, 1], [0, 1], color="k", linestyle="--")
 
-    for curve, method in zip(curves, METHODS):
+    for curve, method in zip(curves, METHODS, strict=False):
         ax.plot(curve[0], curve[1], label=method)
 
     ax.legend()
@@ -219,7 +218,7 @@ def makeFigure():
     threshold = int(components.shape[0] / 10)
     kmf = KaplanMeierFitter()
 
-    for ax, column in zip(axs[5:], components.columns):
+    for ax, column in zip(axs[5:], components.columns, strict=False):
         components = components.sort_values(by=column, ascending=False)
         high_index = components.index[:threshold]
         low_index = components.index[threshold:]

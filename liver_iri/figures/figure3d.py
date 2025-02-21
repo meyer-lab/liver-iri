@@ -59,7 +59,9 @@ def makeFigure():
     # GRO/Flt-3L boxplots
     ############################################################################
 
-    for ax, df, name in zip(axs[2:], [flt3l, gro], ["Flt-3L", "GRO"]):
+    for ax, df, name in zip(
+        axs[2:], [flt3l, gro], ["Flt-3L", "GRO"], strict=False
+    ):
         for index, tp in enumerate(df.columns):
             ax.boxplot(
                 df.loc[:, tp].dropna(),

@@ -64,7 +64,7 @@ def makeFigure():
     }
     tpls_factors = {
         "Patient": pd.Series(
-            tpls.transform(cp_tensors)[:, 1],  # type: ignore
+            tpls.transform(cp_tensors)[:, 1],  # noqa
             index=all_labels.index,
         ),
         "Cytokine": tpls.Xs_factors[0][2][:, 1],
@@ -108,7 +108,9 @@ def makeFigure():
     factor_diff = tpls_factor + ctf_factor
     factor_diff = factor_diff.sort_values(ascending=True)
 
-    for ax, color in zip(axs[:2], [graft_death, component_association]):
+    for ax, color in zip(
+        axs[:2], [graft_death, component_association], strict=False
+    ):
         ax.scatter(tpls_factor, ctf_factor, c=color, edgecolors="black")
         ax.plot([-1.1, 1.1], [1.1, -1.1], linestyle="--", color="black")
 
@@ -124,7 +126,7 @@ def makeFigure():
     # Cytokine / LFTs plotting
     ############################################################################
 
-    for ax, dimension in zip(axs[2:4], ["Cytokine", "LFT"]):
+    for ax, dimension in zip(axs[2:4], ["Cytokine", "LFT"], strict=False):
         tpls_factor = tpls_factors[dimension]
         ctf_factor = ctf_factors[dimension]
         tpls_factor /= abs(tpls_factor).max()
@@ -155,7 +157,9 @@ def makeFigure():
     # Timepoint plotting
     ############################################################################
 
-    for ax, dimension in zip(axs[4:], ["Cytokine Timepoint", "LFT Timepoint"]):
+    for ax, dimension in zip(
+        axs[4:], ["Cytokine Timepoint", "LFT Timepoint"], strict=False
+    ):
         tpls_factor = tpls_factors[dimension]
         ctf_factor = ctf_factors[dimension]
         tpls_factor /= abs(tpls_factor).max()
@@ -194,7 +198,7 @@ def makeFigure():
     high_tpls = factor_diff.index[-30:]
     high_ctf = factor_diff.index[:30]
 
-    for cytokine, ax in zip(["TGFa", "EGF", "Eotaxin"], axs[6:]):
+    for cytokine, ax in zip(["TGFa", "EGF", "Eotaxin"], axs[6:], strict=False):
         cytokine_df = (
             cytokine_measurements.loc[{"Cytokine": cytokine}]
             .squeeze()

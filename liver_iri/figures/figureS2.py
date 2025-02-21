@@ -54,7 +54,7 @@ def makeFigure():
     # Plot LFTs by timecourse
     ############################################################################
 
-    for score, ax in zip(lfts["LFT Score"].values, axs):
+    for score, ax in zip(lfts["LFT Score"].values, axs, strict=False):
         score_array = lfts.sel({"LFT Score": score}).squeeze().to_pandas()
         high_end = score_array.loc[
             score_array.iloc[:, -1] >= thresholds[score], :

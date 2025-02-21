@@ -60,7 +60,7 @@ def makeFigure():
         .to_pandas()
     )
 
-    merged = pd.concat([cytokines, lfts], axis=1)  # type: ignore
+    merged = pd.concat([cytokines, lfts], axis=1)  # noqa
     missing = np.isnan(merged)
     merged = reorder_table(merged.fillna(-1), plot_ax=axs[1])
 

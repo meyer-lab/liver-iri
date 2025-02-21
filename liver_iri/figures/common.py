@@ -5,8 +5,9 @@ This file contains functions that are used in multiple figures.
 import logging
 import sys
 import time
+from collections.abc import Iterable
 from decimal import Decimal
-from typing import Any, Dict, Iterable, Tuple, Union
+from typing import Any
 
 import matplotlib
 import numpy as np
@@ -44,15 +45,15 @@ matplotlib.rcParams["ytick.minor.pad"] = 0.9
 
 
 def getSetup(
-    figsize: Tuple[int, int],
-    gridd: Dict[str, Any],
-    multz: Union[Dict[int, int], None] = None,
-    empts: Union[Iterable[int], None] = None,
+    figsize: tuple[int | int],
+    gridd: dict[str | Any],
+    multz: dict[int | int] | None = None,
+    empts: Iterable[int] | None = None,
     style: str = "whitegrid",
 ):
     """Establish figure set-up with subplots."""
     sns.set(
-        style=style,  # type: ignore
+        style=style,  # noqa
         font_scale=0.7,
         color_codes=True,
         palette="colorblind",
@@ -75,10 +76,10 @@ def getSetup(
     ax = list()
     while x < gridd["nrows"] * gridd["ncols"]:
         if (
-            x not in empts and x not in multz.keys()
+            x not in empts and x not in multz
         ):  # If this is just a normal subplot
             ax.append(f.add_subplot(gs[x]))
-        elif x in multz.keys():  # If this is a subplot that spans grid elements
+        elif x in multz:  # If this is a subplot that spans grid elements
             ax.append(f.add_subplot(gs[x : x + multz[x] + 1]))
             x += multz[x]
         x += 1
@@ -93,8 +94,11 @@ def genFigure():
     start = time.time()
     nameOut = "figure" + sys.argv[1]
 
-    exec("from liver_iri.figures." + nameOut + " import makeFigure", globals())
-    ff = makeFigure()  # type: ignore
+    exec(
+        "from liver_iri.figures." + nameOut + " import makeFigure",  # noqa
+        globals(),
+    )
+    ff = makeFigure()  # noqa
     ff.savefig(
         fdir + nameOut + ".svg", dpi=300, bbox_inches="tight", pad_inches=0
     )
@@ -104,9 +108,7 @@ def genFigure():
     )
 
 
-def plot_scatter(
-    df: pd.DataFrame, ax: Axes, cmap: Union[pd.Series, None] = None
-):
+def plot_scatter(df: pd.DataFrame, ax: Axes, cmap: pd.Series | None = None):
     """
     Plots scatter with regression line.
 
@@ -142,8 +144,8 @@ def plot_scatter(
     ]
 
     ax.plot(xs, ys, color="k", linestyle="--")
-    ax.set_xlabel(df.columns[0])  # type: ignore
-    ax.set_ylabel(df.columns[1])  # type: ignore
+    ax.set_xlabel(df.columns[0])  # noqa
+    ax.set_ylabel(df.columns[1])  # noqa
 
     ax.text(
         0.98,

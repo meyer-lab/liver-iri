@@ -1,10 +1,8 @@
 import warnings
-from typing import Union
 
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-import xarray as xr
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
 from lifelines import CoxPHFitter
@@ -23,7 +21,7 @@ skf = StratifiedKFold(n_splits=20)
 def oversample(
     tensors: list[np.ndarray],
     labels: pd.Series,
-    column: Union[str, None] = None,
+    column: str | None = None,
 ):
     """
     Over-/under-samples tensor data to form balanced dataset.
@@ -248,7 +246,7 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
     return model, c_index, predicted
 
 
-def predict_continuous(data: Union[pd.DataFrame, pd.Series], labels: pd.Series):
+def predict_continuous(data: pd.DataFrame | pd.Series, labels: pd.Series):
     """
     Fits Elastic Net model and hyperparameters to provided data.
 
@@ -333,7 +331,7 @@ def predict_categorical(
         test_data = data.iloc[test_index, :]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(  # type: ignore
+            train_data, train_labels = oversampler.fit_resample(  # noqa
                 train_data, train_labels
             )
 
@@ -384,7 +382,7 @@ def predict_clinical(
         test_data = data.iloc[test_index]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(  # type: ignore
+            train_data, train_labels = oversampler.fit_resample(  # noqa
                 train_data.to_numpy().reshape(-1, 1), train_labels
             )
 

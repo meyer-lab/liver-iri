@@ -80,7 +80,7 @@ def makeFigure():
     # Plot FMS
     ############################################################################
 
-    for ax, score_df in zip(axs, [lft_scores, cyto_scores]):
+    for ax, score_df in zip(axs, [lft_scores, cyto_scores], strict=False):
         mean = score_df.mean(axis=0)
         dev = score_df.std(axis=0)
         ax.fill_between(dev.index, mean - dev, mean + dev, alpha=0.25)
@@ -108,7 +108,7 @@ def makeFigure():
         .stack(merged=("LFT Score", "LFT Timepoint"))
         .to_pandas()
     )
-    flattened = pd.concat([flattened, lfts], axis=1)  # type: ignore
+    flattened = pd.concat([flattened, lfts], axis=1)  # noqa
 
     pca = PCA(flattened, missing="fill-em", ncomp=5)
     assert pca.rsquare is not None

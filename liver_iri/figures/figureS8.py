@@ -65,7 +65,9 @@ def makeFigure():
     labels = labels.dropna()
 
     for ax, dataset in zip(
-        axs[1:], ["pv_scaling", "lft_scaling", "peripheral_scaling"]
+        axs[1:],
+        ["pv_scaling", "lft_scaling", "peripheral_scaling"],
+        strict=False,
     ):
         accuracies = pd.Series(0, index=scalings, dtype=float)
         for scaling in scalings:

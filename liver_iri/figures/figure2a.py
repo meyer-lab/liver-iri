@@ -153,15 +153,18 @@ def makeFigure():
     # Factor heatmaps
     ############################################################################
 
-    for ax, name in zip(axs[list(range(6, len(axs), 2))], factors.keys()):
+    for ax, name in zip(
+        axs[list(range(6, len(axs), 2))], factors.keys(), strict=False
+    ):
         data = factors[name]
         data /= abs(data).max()
         data = data.fillna(0)
 
-        if name == "Patient":
-            data = data.loc[labels.index, :]
-        else:
-            data = reorder_table(data)
+        data = (
+            data.loc[labels.index, :]
+            if name == "Patient"
+            else reorder_table(data)
+        )
 
         cbar = False
         if ax == axs[-2]:

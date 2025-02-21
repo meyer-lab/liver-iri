@@ -61,7 +61,7 @@ select = [
     "ARG",
 ]
 
-[tool.black]
+[tool.ruff]
 line-length = 80
 
 [tool.pyright]
