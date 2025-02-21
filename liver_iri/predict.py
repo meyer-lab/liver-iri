@@ -1,23 +1,15 @@
-from typing import Union
 import warnings
 
-from lifelines import CoxPHFitter
-from lifelines.utils import concordance_index
 import numpy as np
 import pandas as pd
-import xarray as xr
+import statsmodels.api as sm
 from cmtf_pls.cmtf import ctPLS
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.linear_model import (
-    LogisticRegression,
-    LogisticRegressionCV,
-)
+from lifelines import CoxPHFitter
+from lifelines.utils import concordance_index
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from sklearn.model_selection import (
-    KFold,
-    StratifiedKFold
-)
-import statsmodels.api as sm
+from sklearn.model_selection import KFold, StratifiedKFold
 
 warnings.filterwarnings("ignore")
 
@@ -29,7 +21,7 @@ skf = StratifiedKFold(n_splits=20)
 def oversample(
     tensors: list[np.ndarray],
     labels: pd.Series,
-    column: Union[str, None] = None,
+    column: str | None = None,
 ):
     """
     Over-/under-samples tensor data to form balanced dataset.
@@ -230,13 +222,17 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
     for train_index, test_index in skf.split(
         labels.loc[:, "graft_death"], labels.loc[:, "graft_death"]
     ):
-        train_data = data.iloc[train_index, :]
-        test_data = data.iloc[test_index, :]
-        train_labels = labels.iloc[train_index, :]
+        train_data = data.iloc[train_index]
+        test_data = data.iloc[test_index]
+        train_labels = labels.iloc[train_index]
+
+        if isinstance(train_data, pd.Series):
+            train_data = train_data.to_frame()
+            test_data = test_data.to_frame()
 
         oversampler.fit_resample(train_data, train_labels.loc[:, "graft_death"])
-        train_data = train_data.iloc[oversampler.sample_indices_, :]
-        train_labels = train_labels.iloc[oversampler.sample_indices_, :]
+        train_data = train_data.iloc[oversampler.sample_indices_]
+        train_labels = train_labels.iloc[oversampler.sample_indices_]
         train_data = pd.concat([train_data, train_labels], axis=1)
         model.fit(
             train_data, duration_col="survival_time", event_col="graft_death"
@@ -250,9 +246,7 @@ def run_survival(data: pd.DataFrame, labels: pd.DataFrame):
     return model, c_index, predicted
 
 
-def predict_continuous(
-    data: Union[pd.DataFrame, pd.Series], labels: pd.Series
-):
+def predict_continuous(data: pd.DataFrame | pd.Series, labels: pd.Series):
     """
     Fits Elastic Net model and hyperparameters to provided data.
 
@@ -337,7 +331,7 @@ def predict_categorical(
         test_data = data.iloc[test_index, :]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(  # type: ignore
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore # noqa
                 train_data, train_labels
             )
 
@@ -365,6 +359,7 @@ def predict_clinical(
     data: pd.Series,
     labels: pd.Series,
     balanced_resample: bool = True,
+    return_proba: bool = False,
 ):
     """
     Fits Logistic Regression model and hyperparameters to provided data.
@@ -387,15 +382,23 @@ def predict_clinical(
         test_data = data.iloc[test_index]
 
         if balanced_resample:
-            train_data, train_labels = oversampler.fit_resample(  # type: ignore
+            train_data, train_labels = oversampler.fit_resample(  # type: ignore # noqa
                 train_data.to_numpy().reshape(-1, 1), train_labels
             )
 
         model.fit(train_data, train_labels)
-        predicted.iloc[test_index] = model.predict(
-            test_data.values.reshape(-1, 1)
-        )
 
-    acc = balanced_accuracy_score(labels, predicted)
+        if return_proba:
+            predicted.iloc[test_index] = model.predict_proba(
+                test_data.values.reshape(-1, 1)
+            )[:, 1]
+        else:
+            predicted.iloc[test_index] = model.predict(
+                test_data.values.reshape(-1, 1)
+            )
 
-    return acc
+    if return_proba:
+        return predicted
+    else:
+        acc = balanced_accuracy_score(labels, predicted)
+        return acc

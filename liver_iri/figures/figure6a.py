@@ -1,19 +1,20 @@
-"""Plots Figure 6bc-- tPLS 2 Heatmap"""
+"""Plots Figure 6a -- tPLS Boxplots"""
 
 import warnings
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import xarray as xr
+from scipy.stats import ttest_ind
 
 from ..dataimport import build_coupled_tensors, import_meta
 from ..predict import oversample, run_coupled_tpls_classification
 from ..tensor import convert_to_numpy
-from ..utils import reorder_table
 from .common import getSetup
 
 warnings.filterwarnings("ignore")
+
+CYTOKINES = {1: ["IL-1RA", "IL-2", "IL-17A", "IFNg"], 2: ["IL-4", "EGF"]}
 
 
 def makeFigure():
@@ -51,13 +52,6 @@ def makeFigure():
     cytokine_measurements = raw_data["Cytokine Measurements"]
 
     ############################################################################
-    # Figure setup
-    ############################################################################
-
-    axs, fig = getSetup((6, 3), {"ncols": 1, "nrows": 1})
-    ax = axs[0]
-
-    ############################################################################
     # Factorization
     ############################################################################
 
@@ -82,39 +76,70 @@ def makeFigure():
     patient_factors = patient_factors.loc[all_labels.index, :]
     patient_factors /= abs(patient_factors).max(axis=0)
 
-    patient_factors = patient_factors.sort_values(2, ascending=False)
-    high_2, low_2 = patient_factors.index[:30], patient_factors.index[-30:]
+    n_axs = len(CYTOKINES[1]) + len(CYTOKINES[2])
+    axs, fig = getSetup((n_axs * 3, 3), {"ncols": n_axs, "nrows": 1})
+    ax_index = 0
 
     ############################################################################
     # Component boxplots
     ############################################################################
 
-    high_mean = (
-        cytokine_measurements.sel(
-            {
-                "Patient": high_2,
-            }
+    for component, cytokines in CYTOKINES.items():
+        patient_factors = patient_factors.sort_values(
+            component, ascending=False
         )
-        .mean("Patient")
-        .to_pandas()
-    )
-    low_mean = (
-        cytokine_measurements.sel(
-            {
-                "Patient": low_2,
-            }
+        high_comp, low_comp = (
+            patient_factors.index[:30],
+            patient_factors.index[-30:],
         )
-        .mean("Patient")
-        .to_pandas()
-    )
-    diff = high_mean - low_mean
-    diff = reorder_table(diff.T).T
+        for cytokine in cytokines:
+            ax = axs[ax_index]
+            cytokine_df = cytokine_measurements.loc[
+                {
+                    "Cytokine": cytokine,
+                }
+            ].to_pandas()
+            timepoints = list(cytokine_df.columns)
+            for index, tp in enumerate(cytokine_df.columns):
+                low_patch = ax.boxplot(
+                    cytokine_df.loc[low_comp, tp].dropna(),
+                    patch_artist=True,
+                    positions=[index * 3],
+                    notch=True,
+                    vert=True,
+                    widths=0.9,
+                    flierprops={"markersize": 6, "markerfacecolor": "tab:blue"},
+                )
+                high_patch = ax.boxplot(
+                    cytokine_df.loc[high_comp, tp].dropna(),
+                    patch_artist=True,
+                    positions=[index * 3 + 1],
+                    notch=True,
+                    vert=True,
+                    widths=0.9,
+                    flierprops={
+                        "markersize": 6,
+                        "markerfacecolor": "tab:orange",
+                    },
+                )
+                low_patch["boxes"][0].set_facecolor("tab:blue")
+                high_patch["boxes"][0].set_facecolor("tab:orange")
 
-    sns.heatmap(
-        diff, center=0, ax=ax, cmap="coolwarm", square=True, linewidths=0.1
-    )
-    ax.set_yticklabels(diff.index)
-    ax.set_xticks(np.arange(0.5, diff.shape[1]))
-    ax.set_xticklabels(diff.columns, rotation=90)
+                result = ttest_ind(
+                    cytokine_df.loc[high_comp, tp].dropna(),
+                    cytokine_df.loc[low_comp, tp].dropna(),
+                )
+                if result.pvalue < 0.01:
+                    timepoints[index] = timepoints[index] + "**"
+                elif result.pvalue < 0.05:
+                    timepoints[index] = timepoints[index] + "*"
+
+            ax.set_xticks(np.arange(0.5, 6 * 3, 3))
+            ax.set_xticklabels(timepoints)
+            ax.set_xlim([-1, 3 * 6 - 1])
+            ax.set_ylabel("Cytokine Expression")
+            ax.set_title(f"tPLS {component}: {cytokine}")
+
+            ax_index += 1
 
     return fig

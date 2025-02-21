@@ -1,15 +1,15 @@
-"""Plots Figure 2a -- CP Factorization"""
+"""Plots Figure 2a -- CTF Factor Matrices"""
+
+import numpy as np
+import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Patch
-import numpy as np
-import pandas as pd
-import seaborn as sns
 from sklearn.preprocessing import LabelEncoder
 
-from .common import getSetup
 from ..dataimport import build_coupled_tensors, import_meta
 from ..tensor import run_coupled
 from ..utils import reorder_table
+from .common import getSetup
 
 
 def makeFigure():
@@ -19,15 +19,13 @@ def makeFigure():
 
     meta = import_meta(long_survival=False, no_missing=True)
     data = build_coupled_tensors(
-        pv_scaling=1,
-        lft_scaling=1,
-        no_missing=True
+        peripheral_scaling=1, pv_scaling=1, lft_scaling=1, no_missing=True
     )
 
     _, cp = run_coupled(data)
     factors = {}
     for mode in cp.modes:
-        if "Timepoint" not in mode:
+        if "Timepoint" not in str(mode):
             factors[mode] = cp.x[f"_{mode}"].to_pandas()
 
     ############################################################################
@@ -70,6 +68,7 @@ def makeFigure():
 
     le = LabelEncoder()
     labels.loc[:, "etiology"] = le.fit_transform(labels.loc[:, "etiol"])
+    assert le.classes_ is not None
     labels = labels.sort_values(by=["graft_death", "liri", "etiol"])
 
     liri_cmap = LinearSegmentedColormap.from_list(
@@ -112,7 +111,7 @@ def makeFigure():
     ]
     for i in range(len(le.classes_)):
         legend_elements.append(Patch(facecolor=colors[i]))
-        legend_names.append(le.classes_[i])
+        legend_names.append(str(le.classes_[i]))
 
     ############################################################################
     # Meta-data heatmaps
@@ -154,15 +153,18 @@ def makeFigure():
     # Factor heatmaps
     ############################################################################
 
-    for ax, name in zip(axs[list(range(6, len(axs), 2))], factors.keys()):
+    for ax, name in zip(
+        axs[list(range(6, len(axs), 2))], factors.keys(), strict=False
+    ):
         data = factors[name]
         data /= abs(data).max()
         data = data.fillna(0)
 
-        if name == "Patient":
-            data = data.loc[labels.index, :]
-        else:
-            data = reorder_table(data)
+        data = (
+            data.loc[labels.index, :]
+            if name == "Patient"
+            else reorder_table(data)
+        )
 
         cbar = False
         if ax == axs[-2]:

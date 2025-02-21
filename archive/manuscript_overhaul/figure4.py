@@ -1,17 +1,17 @@
 """Plots Figure 4 -- tPLS Model Accuracy"""
+
 import warnings
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import LabelEncoder
 
 from ..dataimport import (
     build_coupled_tensors,
     cytokine_data,
-    lft_data,
     import_meta,
+    lft_data,
 )
 from ..predict import (
     predict_categorical,
@@ -216,7 +216,7 @@ def makeFigure():
     ]
     ax.plot([0, 1], [0, 1], color="k", linestyle="--")
 
-    for curve, method in zip(curves, METHODS):
+    for curve, method in zip(curves, METHODS, strict=False):
         ax.plot(curve[0], curve[1], label=method)
 
     ax.legend()

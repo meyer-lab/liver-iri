@@ -1,10 +1,10 @@
-"""Plots Figure 2b -- CP Factorization Timepoint Associations"""
-import numpy as np
-import xarray as xr
+"""Plots Figure 2b -- CTF Factorization Timepoints"""
 
-from .common import getSetup
+import numpy as np
+
 from ..dataimport import build_coupled_tensors
 from ..tensor import run_coupled
+from .common import getSetup
 
 
 def makeFigure():
@@ -13,9 +13,7 @@ def makeFigure():
     ############################################################################
 
     data = build_coupled_tensors(
-        pv_scaling=1,
-        lft_scaling=1,
-        no_missing=True
+        peripheral_scaling=1, pv_scaling=1, lft_scaling=1, no_missing=True
     )
 
     ############################################################################
@@ -25,14 +23,22 @@ def makeFigure():
     _, cp = run_coupled(data, rank=4)
     factors = {}
     for mode in cp.modes:
-        if "Timepoint" in mode:
+        if "Timepoint" in str(mode):
             factors[mode] = cp.x[f"_{mode}"].to_pandas()
+
+    ############################################################################
+    # Figure setup
+    ############################################################################
 
     axs, fig = getSetup(
         (len(factors) * 3, 3), {"nrows": 1, "ncols": len(factors)}
     )
 
-    for ax, (name, df) in zip(axs, factors.items()):
+    ############################################################################
+    # Plot timepoint associations
+    ############################################################################
+
+    for ax, (name, df) in zip(axs, factors.items(), strict=False):
         for component in df.columns:
             ax.plot(
                 np.arange(df.shape[0]),

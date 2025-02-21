@@ -61,8 +61,11 @@ select = [
     "ARG",
 ]
 
-[tool.black]
+[tool.ruff]
 line-length = 80
+
+[tool.pyright]
+reportAttributeAccessIssue = false
 
 [project.scripts]
 fbuild = "liver_iri.figures.common:genFigure"
