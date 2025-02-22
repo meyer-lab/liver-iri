@@ -33,7 +33,7 @@ def makeFigure():
     # Figure setup
     ############################################################################
 
-    axs, fig = getSetup((12, 3), {"nrows": 1, "ncols": 4})
+    axs, fig = getSetup((15, 3), {"nrows": 1, "ncols": 5})
 
     ############################################################################
     # IL-9 Errorbars
@@ -46,18 +46,30 @@ def makeFigure():
     low_il_9 = il_9.loc[il_9.loc[:, "PO"] <= 2, :]
     mid_il_9 = il_9.drop(high_il_9.index).drop(low_il_9.index)
 
-    ax = axs[0]
     colors = ["tab:green", "black", "tab:red"]
-    for index, (df, color) in enumerate(
-        zip([low_il_9, mid_il_9, high_il_9], colors, strict=False)
-    ):
-        ax.errorbar(
+    labels = ["Low", "Medium", "High"]
+    for index, (df, label, color) in enumerate(zip(
+        [low_il_9, mid_il_9, high_il_9],
+        labels,
+        colors,
+        strict=False
+    )):
+        axs[0].errorbar(
             np.arange(df.shape[1]) + (index - 1) * 0.1,
             df.mean(axis=0),
             yerr=df.std(axis=0),
             capsize=1,
             color=color,
         )
+        axs[1].plot(
+            np.arange(df.shape[1]),
+            df.T,
+            color=color,
+            alpha=0.25,
+        )
+
+    axs[0].legend(labels)
+    axs[1].legend(labels)
 
     ############################################################################
     # IL-9 Correlations
@@ -65,12 +77,12 @@ def makeFigure():
 
     for df, title, ax in zip(
         [low_il_9, mid_il_9, high_il_9],
-        ["Low", "Middle", "High"],
-        axs[1:],
+        labels,
+        axs[2:],
         strict=False,
     ):
         df = df.loc[:, ["PO", "D1"]]
         plot_scatter(df, ax)
-        ax.set_title(title)
+        ax.set_title(f"{title} (n={str(df.shape[0])})")
 
     return fig
