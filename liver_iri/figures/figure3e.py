@@ -47,29 +47,32 @@ def makeFigure():
     mid_il_9 = il_9.drop(high_il_9.index).drop(low_il_9.index)
 
     colors = ["tab:green", "black", "tab:red"]
-    labels = ["Low", "Medium", "High"]
+    labels = ["Low Pre-Op IL-9", "Medium Pre-Op IL-9", "High Pre-Op IL-9"]
     for index, (df, label, color) in enumerate(zip(
         [low_il_9, mid_il_9, high_il_9],
         labels,
         colors,
         strict=False
     )):
-        axs[0].errorbar(
+        axs[0].plot(
+            np.arange(df.shape[1]),
+            df.T,
+            color=color,
+            alpha=0.25,
+        )
+        axs[1].errorbar(
             np.arange(df.shape[1]) + (index - 1) * 0.1,
             df.mean(axis=0),
             yerr=df.std(axis=0),
             capsize=1,
             color=color,
         )
-        axs[1].plot(
-            np.arange(df.shape[1]),
-            df.T,
-            color=color,
-            alpha=0.25,
-        )
 
-    axs[0].legend(labels)
-    axs[1].legend(labels)
+    for ax in axs[:2]:
+        ax.legend(labels)
+        ax.set_ylabel("IL-9")
+        ax.set_xticks(np.arange(il_9.shape[1]))
+        ax.set_xticklabels(il_9.columns)
 
     ############################################################################
     # IL-9 Correlations
@@ -82,6 +85,7 @@ def makeFigure():
         strict=False,
     ):
         df = df.loc[:, ["PO", "D1"]]
+        df.columns = df.columns + ": IL-9"
         plot_scatter(df, ax)
         ax.set_title(f"{title} (n={str(df.shape[0])})")
 
